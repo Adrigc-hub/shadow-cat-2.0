@@ -19,3 +19,4 @@ V1.11: pls be fixed now.
 V1.12: i really think this will fix the game. 
 V1.13: deleted loading screen. 
 V1.14: just a test. 
+V1.15: added the loading screen again, added more effects and fixed some issues
