@@ -5,3 +5,4 @@
 
 
 Update Information: updated the skins and effects, now it has more mini games etc etc
+V2: made a sans type secret boss fight and 20 random attacks, fixed the random bullet problem and now you have a secret power
