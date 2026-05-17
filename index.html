@@ -3,153 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SHADOW CAT: COLD COMPILATION</title>
+    <title>Shadow Cat: Jujutsu Chronicles</title>
     <style>
-        body {
-            margin: 0; padding: 0;
-            background-color: #020205; color: white;
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            overflow: hidden; user-select: none; -webkit-user-select: none;
-            touch-action: none;
+        /* --- ESTILOS GENERALES Y RESETS --- */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
         }
-        #pantalla-carga {
-            position: absolute; width: 100%; height: 100%;
-            background: #010103; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 200;
-        }
-        .barra-progreso-contenedor {
-            width: 70%; max-width: 300px; height: 6px;
-            background: #111122; border-radius: 3px; overflow: hidden; margin-top: 15px;
-            border: 1px solid #222;
-        }
-        #barra-progreso-linea {
-            width: 0%; height: 100%; background: #9000c7;
-            box-shadow: 0 0 10px #a333ff;
-        }
-        #texto-matematico {
-            font-family: 'Courier New', Courier, monospace; font-size: 11px;
-            color: #00ffcc; margin-top: 10px; min-height: 15px; text-align: center;
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #020205;
+            font-family: 'Courier New', Courier, monospace;
         }
 
+        /* Canvas principal siempre de fondo */
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* --- CAPAS DE INTERFAZ SOBRE EL CANVAS --- */
         .pantalla {
-            position: absolute; width: 100%; height: 100%;
-            display: none; flex-direction: column;
-            align-items: center; justify-content: center;
-            box-sizing: border-box; padding: 20px; z-index: 5;
-            opacity: 0; transition: opacity 0.4s ease;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            pointer-events: none; /* Deja ver el canvas de fondo */
         }
-        .activa { display: flex; opacity: 1; }
-        
-        .titulo-principal { font-size: 26px; letter-spacing: 2px; margin-bottom: 5px; text-align: center; font-weight: bold; color: #fff; text-shadow: 0 0 12px #9000c7; }
-        .subtitulo { font-size: 11px; color: #a333ff; margin-bottom: 25px; text-transform: uppercase; font-weight: bold; }
-        .marcador-puntos { font-size: 15px; color: #ffcc00; margin-bottom: 30px; font-weight: bold; }
-        
+        .pantalla.activa {
+            display: flex;
+        }
+
+        /* Botones y elementos cliqueables deben reaccionar al touch */
+        .zona-interactiva {
+            pointer-events: auto;
+        }
+
+        /* --- MENÚ PRINCIPAL --- */
+        .titulo-juego {
+            font-size: 28px;
+            color: #ff3c3c;
+            font-weight: bold;
+            text-shadow: 0 0 12px rgba(255, 60, 60, 0.6);
+            margin-bottom: 160px; /* Espacio para que se vea el gato en la banca */
+            text-align: center;
+        }
+
+        .contenedor-botones {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
         .btn-menu {
-            width: 85%; max-width: 280px; padding: 14px; margin: 8px 0;
-            border: none; border-radius: 8px; font-size: 13px; font-weight: bold;
-            color: white; cursor: pointer; text-transform: uppercase;
+            width: 260px;
+            height: 45px;
+            background: rgba(0, 255, 130, 0.05);
+            border: 2px solid transparent; /* La animación del canvas dibuja el borde neón */
+            color: #00ff82;
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .btn-azul { background: #007bef; }
-        .btn-rosa { background: #e60067; }
-        .btn-morado { background: #9000c7; }
-        .btn-verde { background: #00b359; }
-
-        .lista-tienda {
-            width: 90%; max-width: 320px; max-height: 240px;
-            overflow-y: auto; background: #07070d; border: 1px solid #1a1a30;
-            border-radius: 12px; padding: 10px; box-sizing: border-box; margin-bottom: 20px;
-        }
-        .item-habilidad {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 10px; border-bottom: 1px solid #11111e;
-        }
-        .btn-comprar {
-            background: #ffcc00; color: black; border: none;
-            padding: 8px 14px; border-radius: 5px; font-weight: bold; cursor: pointer;
+        .btn-menu:active {
+            background: rgba(0, 255, 130, 0.2);
         }
 
+        /* --- HUD EN PARTIDA --- */
         #hud-juego {
-            position: absolute; top: 15px; left: 0; width: 100%;
-            padding: 0 20px; box-sizing: border-box;
-            display: none; justify-content: space-between; align-items: center;
-            z-index: 10; pointer-events: none;
-        }
-        .stats-hud {
-            color: white; font-size: 13px; font-weight: bold;
-            text-shadow: 1px 1px 2px black; pointer-events: auto;
-            background: rgba(0,0,0,0.7); padding: 8px 12px; border-radius: 6px;
-            border: 1px solid #222;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px 20px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 20;
+            color: #fff;
+            font-size: 16px;
         }
         .btn-pausa {
-            padding: 8px 14px; background: rgba(255,255,255,0.15);
-            border: 1px solid rgba(255,255,255,0.3); color: white;
-            border-radius: 6px; font-weight: bold; cursor: pointer; pointer-events: auto;
+            background: #ff3c3c;
+            border: none;
+            color: white;
+            padding: 5px 12px;
+            font-weight: bold;
+            cursor: pointer;
+            pointer-events: auto;
         }
 
+        /* --- MENÚ DE PAUSA --- */
         #menu-pausa {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(2, 2, 5, 0.9); display: none;
-            flex-direction: column; align-items: center; justify-content: center; z-index: 100;
-        }
-        
-        #btn-purpura {
-            position: absolute; bottom: 30px; right: 30px;
-            width: 75px; height: 75px; background: #a333ff;
-            border: 3px solid white; border-radius: 50%;
-            color: white; font-weight: bold; font-size: 11px;
-            display: none; align-items: center; justify-content: center;
-            box-shadow: 0 0 15px #a333ff; z-index: 50; cursor: pointer;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 2, 5, 0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+            color: white;
         }
 
-        #canvasJuego { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        /* --- TIENDA DE HECHICEROS (SKINS) --- */
+        .tienda-titulo {
+            color: #a333ff;
+            font-size: 24px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(163, 51, 255, 0.5);
+        }
+        #contenedor-hechiceros {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 50%;
+            overflow-y: auto;
+            pointer-events: auto;
+            padding: 10px;
+        }
+        .item-habilidad {
+            width: 260px;
+            padding: 12px;
+            background: rgba(163, 51, 255, 0.1);
+            border: 1px solid #a333ff;
+            color: white;
+            text-align: center;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .item-habilidad:active {
+            background: rgba(163, 51, 255, 0.3);
+        }
     </style>
 </head>
 <body>
 
-    <audio id="musica-gd" loop>
-        <source src="https://audio.jofre.de/stayinsideme.mp3" type="audio/mp3">
-    </audio>
-
-    <div id="pantalla-carga">
-        <div style="font-weight: bold; font-size: 14px; letter-spacing: 3px; color: #a333ff;" id="tit-compile">COMPILING GEOMETRY_CORE</div>
-        <div class="barra-progreso-contenedor">
-            <div id="barra-progreso-linea"></div>
-        </div>
-        <div id="texto-matematico">f(x) = sin(θ) * core_matrix</div>
-    </div>
-
     <canvas id="canvasJuego"></canvas>
 
-    <div id="btn-purpura" onclick="detonarIlimitadoPurpura()">PÚRPURA</div>
-
     <div id="hud-juego">
-        <div class="stats-hud" id="txt-hud-stats">Iniciando...</div>
-        <button class="btn-pausa" onclick="activarPausa(true)">⏸ PAUSA</button>
+        <div>Puntos Totales: <span id="txt-puntos">0</span></div>
+        <button class="btn-pausa" onclick="activarPausa(true)">PAUSA</button>
     </div>
 
-    <div id="menu-pausa">
-        <div style="background: #07070d; padding: 30px; border-radius: 14px; text-align: center; border: 1px solid #222;">
-            <h3 style="margin-top:0; color:#ffcc00;">JUEGO PAUSADO</h3>
-            <button class="btn-menu btn-azul" style="width:100%;" onclick="activarPausa(false)">Reanudar</button>
-            <button class="btn-menu btn-rosa" style="width:100%; margin-top:10px;" onclick="volverAlMenuPrincipal()">Menú Principal</button>
+    <div id="pantalla-menu" class="pantalla activa">
+        <div class="titulo-juego">SHADOW CAT:<br>JUJUTSU CHRONICLES</div>
+        <div class="contenedor-botones zona-interactiva">
+            <div class="btn-menu" onclick="cambiarPantalla('juego-original')">MODO ORIGINAL</div>
+            <div class="btn-menu" onclick="cambiarPantalla('juego-ritmo')">DANCE OF FIRE</div>
+            <div class="btn-menu" onclick="cambiarPantalla('juego-shoot')">SHOOT THE BOX</div>
+            <div class="btn-menu" onclick="cambiarPantalla('hechiceros')">HECHICEROS (SKINS)</div>
         </div>
-    </div>
-
-    <div id="pantalla-menu" class="pantalla">
-        <h1 class="titulo-principal">SHADOW CAT 3.0</h1>
-        <div class="subtitulo">True Cat Physics & SPECIAL FX</div>
-        <div class="marcador-puntos">Mis Puntos: <span id="txt-puntos">0</span> PTS</div>
-        
-        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-original')">Modo Arena (Original)</button>
-        <button class="btn-menu btn-verde" onclick="cambiarPantalla('juego-ritmo')">Dance of Fire and Ice</button>
-        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-shoot')">Shoot the Box Remastered</button>
-        <button class="btn-menu btn-rosa" onclick="cambiarPantalla('hechiceros')">Skins de Gatos</button>
     </div>
 
     <div id="pantalla-hechiceros" class="pantalla">
-        <h2>CAMBIAR SKIN</h2>
-        <div class="lista-tienda" id="contenedor-hechiceros"></div>
-        <button class="btn-menu btn-rosa" onclick="cambiarPantalla('menu')">Volver</button>
+        <div class="tienda-titulo">EXPANSIÓN DE DOMINIO</div>
+        <div id="contenedor-hechiceros"></div>
+        <br>
+        <div class="btn-menu zona-interactiva" style="border: 1px solid #00ff82;" onclick="cambiarPantalla('menu')">VOLVER</div>
+    </div>
+
+    <div id="menu-pausa">
+        <h2>JUEGO PAUSADO</h2>
+        <br><br>
+        <div class="contenedor-botones zona-interactiva">
+            <div class="btn-menu" style="color:#00ff82;" onclick="activarPausa(false)">RESUMIR</div>
+            <div class="btn-menu" style="color:#ff3c3c;" onclick="volverAlMenuPrincipal()">SALIR AL MENÚ</div>
+        </div>
     </div>
 
     <script src="sketch.js"></script>
