@@ -1,10 +1,11 @@
-// --- CONFIGURACIÓN DE RENDIMIENTO Y DECORACIÓN ---
-let modoActual = "menu"; // menu, ritmo, disparos, campaña
+// --- VARIABLES DE MOTOR PRINCIPAL ---
+let modoActual = "menu"; // menu, ritmo, disparos, campaña, boss_secreto
+let juegoPausado = false;
 let estrellas = [];
 let ondasToque = [];
 let particulasEnergia = [];
 
-// Base de Datos de Habilidades (15)
+// Base de Datos Estética de Habilidades
 const CONFIG_TIENDA = [
     { n: "Destello Negro", p: 150, d: "Golpe rítmico crítico físico." },
     { n: "Vacío Inconmensurable", p: 1000, d: "Congela la pantalla por completo." },
@@ -23,341 +24,357 @@ const CONFIG_TIENDA = [
     { n: "Impacto Crítico", p: 180, d: "Físicas pesadas contra estructuras." }
 ];
 
-// Configuración de Skins e Identidades Visuales Avanzadas
+// Configuración de Skins Realistas (Gradientes y Texturas Ópticas)
 const SKINS = {
-    "Gojo": { colorPrimario: [0, 150, 255], colorAura: [100, 200, 255, 40], fondo: [5, 5, 25] },
-    "Itadori": { colorPrimario: [255, 60, 60], colorAura: [255, 150, 150, 40], fondo: [25, 5, 5] },
-    "Megumi": { colorPrimario: [40, 200, 130], colorAura: [100, 255, 180, 30], fondo: [5, 20, 15] },
-    "Sukuna": { colorPrimario: [180, 0, 50], colorAura: [255, 0, 100, 45], fondo: [20, 2, 8] }
+    "Gojo": { centro: [255, 255, 255], brillo: [0, 160, 255], aura: [15, 80, 200, 25], fondo: [3, 4, 18] },
+    "Itadori": { centro: [255, 200, 180], brillo: [255, 50, 50], aura: [180, 30, 30, 25], fondo: [16, 3, 3] },
+    "Megumi": { centro: [200, 255, 220], brillo: [0, 200, 110], aura: [20, 120, 80, 20], fondo: [2, 14, 10] },
+    "Sukuna": { centro: [255, 150, 150], brillo: [150, 0, 30], aura: [100, 0, 20, 30], fondo: [12, 1, 5] }
 };
 let nombresSkins = ["Gojo", "Itadori", "Megumi", "Sukuna"];
 let idxSkin = 0;
 let skinActiva = "Gojo";
 
-// Variables de Animación de "Existir"
 let oscilacionVida = 0;
 
-// Instancias de Motores de Minijuegos
-let motorRitmo;
-let motorCajas;
-let motorCampaña;
+// Instancias de Modos
+let motorRitmo, motorCajas, motorCampaña, motorBossSecreto;
 
-// --- CONFIGURACIÓN INICIAL DE P5.JS ---
 function setup() {
     createCanvas(windowWidth, windowHeight);
     
-    // Crear el campo de estrellas decorativas espaciales
-    for (let i = 0; i < 60; i++) {
-        estrellas.push({ x: random(width), y: random(height), tam: random(1, 3), brillo: random(100, 255) });
+    // Polvo cósmico y estrellas de fondo
+    for (let i = 0; i < 75; i++) {
+        estrellas.push({ x: random(width), y: random(height), tam: random(1, 2.5), b: random(80, 255), velB: random(2, 5) });
     }
     
-    // Inicializar los componentes de los minijuegos de forma segura
     motorRitmo = new ControladorDanceOfFire();
     motorCajas = new ControladorShootTheBox();
     motorCampaña = new ControladorCampania();
+    motorBossSecreto = new ControladorBossSecreto();
 
-    // Inyectar de forma segura la tienda en el HTML sin congelamientos
     let contenedorTienda = document.getElementById("box-tienda");
     if (contenedorTienda) {
         contenedorTienda.innerHTML = CONFIG_TIENDA.map(h => `
             <div class="item-tienda">
                 <strong style="color:#fff;">${h.n}</strong>
-                <span style="color:#aaa; display:block; font-size:9px; margin-top:2px;">${h.d}</span>
+                <span style="color:#888; display:block; font-size:9px; margin-top:2px;">${h.d}</span>
                 <button onclick="event.stopPropagation();">$${h.p}</button>
             </div>
         `).join('');
     }
 }
 
-// --- BUCLE PRINCIPAL DE RENDERIZADO GRÁFICO (60 FPS) ---
 function draw() {
-    // Renderizado del fondo cósmico cambiante basado en la skin
-    let configVisual = SKINS[skinActiva];
-    background(configVisual.fondo[0], configVisual.fondo[1], configVisual.fondo[2]);
+    // Renderizado de fondo espacial realista basado en la skin existente
+    let colF = SKINS[skinActiva].fondo;
+    background(colF[0], colF[1], colF[2]);
     
-    // Dibujar y hacer parpadear la decoración de estrellas espaciales
-    fill(255);
+    // Fondo estrellado parpadeante
     noStroke();
     estrellas.forEach(e => {
-        e.brillo += random(-10, 10);
-        let b = constrain(e.brillo, 100, 255);
-        fill(255, b);
+        e.b += e.velB;
+        if (e.b > 255 || e.b < 80) e.velB *= -1;
+        fill(255, e.b);
         ellipse(e.x, e.y, e.tam, e.tam);
     });
 
-    // Enrutar pantallas
-    if (modoActual === "menu") {
-        dibujarPersonajeExistiendo();
-    } else if (modoActual === "ritmo") {
-        motorRitmo.ejecutar();
-    } else if (modoActual === "disparos") {
-        motorCajas.ejecutar();
-    } else if (modoActual === "campaña") {
-        motorCampaña.ejecutar();
+    // Lógica del Bucle: Se detienen las físicas si el juego está en pausa
+    if (!juegoPausado) {
+        oscilacionVida += 0.04;
+        
+        if (modoActual === "ritmo") motorRitmo.actualizar();
+        if (modoActual === "disparos") motorCajas.actualizar();
+        if (modoActual === "campaña") motorCampaña.actualizar();
+        if (modoActual === "boss_secreto") motorBossSecreto.actualizar();
+        
+        actualizarParticulas();
     }
 
-    // Renderizar efectos de partículas de energía de forma fluida
-    actualizarParticulas();
+    // El renderizado gráfico continúa corriendo para que el menú de pausa no congele los efectos visuales
+    if (modoActual === "menu") dibujarPersonajeExistiendo();
+    if (modoActual === "ritmo") motorRitmo.dibujar();
+    if (modoActual === "disparos") motorCajas.dibujar();
+    if (modoActual === "campaña") motorCampaña.dibujar();
+    if (modoActual === "boss_secreto") motorBossSecreto.dibujar();
 
-    // Renderizar ondas de impacto/apachar en pantalla
-    actualizarOndasToque();
+    dibujarParticulas();
+    actualizarYRenderizarOndas();
 }
 
-// --- ANIMACIÓN REALISTA E HIPERFLUIDA PARA EXISTIR (IDLE) ---
+// --- RENDIDERIZADO REALISTA ULTRA FLUIDO DE AVATAR ---
 function dibujarPersonajeExistiendo() {
     push();
     translate(width / 2, height / 2 - 60);
     
-    oscilacionVida += 0.04;
-    // Escala elástica avanzada para simular respiración real de la skin
-    let escalaY = 1.0 + sin(oscilacionVida) * 0.04;
-    let escalaX = 1.0 - sin(oscilacionVida) * 0.02;
-    scale(escalaX, escalaY);
+    let despY = sin(oscilacionVida) * 0.03;
+    let despX = cos(oscilacionVida) * 0.01;
+    scale(1.0 + despX, 1.0 + despY);
 
-    let info = SKINS[skinActiva];
+    let sk = SKINS[skinActiva];
 
-    // Efecto de aura brillante de energía mística (Mejor renderizado)
-    for (let i = 3; i > 0; i--) {
-        fill(info.colorAura[0], info.colorAura[1], info.colorAura[2], (info.colorAura[3] / i) + sin(oscilacionVida)*5);
-        ellipse(0, 0, 90 + (i * 25), 90 + (i * 25));
+    // Renderizado de Aura Volumétrica por capas de difusión
+    for (let i = 4; i > 0; i--) {
+        fill(sk.aura[0], sk.aura[1], sk.aura[2], sk.aura[3] / (i * 0.7));
+        ellipse(0, 0, 80 + (i * 28), 80 + (i * 28));
     }
 
-    // Núcleo del Personaje
-    stroke(255, 180);
-    strokeWeight(3);
-    fill(info.colorPrimario[0], info.colorPrimario[1], info.colorPrimario[2]);
-    ellipse(0, 0, 90, 90);
+    // Sombreado e Iluminación Esférica de Alta Fidelidad (Efecto Realista 3D)
+    for (let r = 85; r > 0; r -= 3) {
+        let inter = map(r, 0, 85, 1, 0);
+        let c = lerpColor(color(sk.brillo[0], sk.brillo[1], sk.brillo[2]), color(sk.centro[0], sk.centro[1], sk.centro[2]), inter);
+        fill(c);
+        ellipse(-3, -3, r, r);
+    }
     
-    // Detalles estéticos internos (Ojos brillantes simulados)
-    fill(255);
-    noStroke();
-    ellipse(-15, -5, 12, 6);
-    ellipse(15, -5, 12, 6);
+    // Destellos e Intermitencias Cósmicas
+    fill(255, 200 + sin(oscilacionVida * 2) * 55);
+    ellipse(-18, -8, 14, 5);
+    ellipse(18, -8, 14, 5);
     pop();
 
-    // UI flotante de instrucciones en el lienzo
     textAlign(CENTER);
-    textSize(14);
-    fill(255, 160);
-    text("Toca al personaje para alternar entre Gojo, Itadori, Megumi y Sukuna", width / 2, height / 2 + 60);
-    textSize(20);
-    fill(255);
-    text(`Skin Existente: ${skinActiva}`, width / 2, height / 2 + 95);
+    textSize(13); fill(255, 140);
+    text("TAP PARA ALTERNAR SKIN REALISTA", width / 2, height / 2 + 50);
+    textSize(22); fill(255);
+    text(skinActiva, width / 2, height / 2 + 85);
 }
 
-// --- LOGICA DEL MINIJUEGO: DANCE OF FIRE ---
+// --- SISTEMA DE PAUSA CONTROLADO ---
+function pausarJuego() {
+    juegoPausado = true;
+    document.getElementById("menu-pausa").style.display = "block";
+}
+
+function reanudarJuego() {
+    juegoPausado = false;
+    document.getElementById("menu-pausa").style.display = "none";
+}
+
+// --- REFACTORIZACIÓN DANCE OF FIRE ---
 class ControladorDanceOfFire {
-    constructor() {
-        this.angulo = 0;
-        this.velocidad = 0.06;
-        this.baldosas = [
-            {x: 200, y: 400}, {x: 300, y: 400}, {x: 400, y: 400},
-            {x: 400, y: 300}, {x: 500, y: 300}, {x: 500, y: 200}
-        ];
-        this.indice = 0;
-        this.px = 0; this.py = 0;
-        this.radio = 50;
+    constructor() { this.baldosas = [{x:200,y:400},{x:300,y:400},{x:400,y:400},{x:400,y:300},{x:500,y:300}]; this.idx = 0; this.ang = 0; this.r = 45; }
+    iniciar() { this.idx = 0; this.ang = 0; }
+    actualizar() {
+        this.ang += 0.06;
+        let c = this.baldosas[this.idx];
+        this.px = c.x + cos(this.ang) * this.r;
+        this.py = c.y + sin(this.ang) * this.r;
     }
-
-    iniciar() { this.indice = 0; this.angulo = 0; }
-
-    ejecutar() {
-        if (this.baldosas.length === 0) return;
-        
-        this.angulo += this.velocidad;
-        let centro = this.baldosas[this.indice];
-        this.px = centro.x + cos(this.angulo) * this.radio;
-        this.py = centro.y + sin(this.angulo) * this.radio;
-
-        // Dibujar baldosas con mejor renderizado
+    dibujar() {
         for (let i = 0; i < this.baldosas.length; i++) {
             let b = this.baldosas[i];
-            if (i === this.indice) {
-                fill(0, 255, 200, 180);
-                stroke(255);
-                strokeWeight(2);
-                ellipse(b.x, b.y, 45, 45);
-            } else {
-                fill(255, 40);
-                noStroke();
-                ellipse(b.x, b.y, 35, 35);
-            }
+            fill(i === this.idx ? [0, 255, 180, 180] : [255, 40]);
+            stroke(255, i === this.idx ? 255 : 30);
+            ellipse(b.x, b.y, i === this.idx ? 40 : 30, i === this.idx ? 40 : 30);
         }
-
-        // Línea de órbita y Planeta rítmico
-        stroke(255, 150);
-        line(centro.x, centro.y, this.px, this.py);
-        fill(255, 50, 100);
-        noStroke();
-        ellipse(this.px, this.py, 20, 20);
+        stroke(255, 100); line(this.baldosas[this.idx].x, this.baldosas[this.idx].y, this.px, this.py);
+        fill(255, 40, 90); noStroke(); ellipse(this.px, this.py, 18, 18);
     }
-
-    chequearToque() {
-        let siguiente = this.baldosas[this.indice + 1];
-        if (!siguiente) { this.indice = 0; return; }
-
-        // Hitbox perfecta arreglada por distancia euclidiana
-        let d = dist(this.px, this.py, siguiente.x, siguiente.y);
-        if (d < 38) {
-            this.indice++;
-            this.angulo = atan2(this.py - siguiente.y, this.px - siguiente.x);
-            crearExplosionParticulas(this.px, this.py, [0, 255, 200]);
+    toque() {
+        let sig = this.baldosas[this.idx + 1];
+        if (!sig) { this.idx = 0; return; }
+        if (dist(this.px, this.py, sig.x, sig.y) < 35) {
+            this.idx++;
+            this.ang = atan2(this.py - sig.y, this.px - sig.x);
+            crearExplosionParticulas(this.px, this.py, [0, 255, 180]);
         }
     }
 }
 
-// --- LOGICA DEL MINIJUEGO: SHOOT THE BOX ---
+// --- REFACTORIZACIÓN SHOOT THE BOX ---
 class ControladorShootTheBox {
-    constructor() { this.cajas = []; this.puntos = 0; }
-    iniciar() { this.cajas = []; this.puntos = 0; }
-
-    ejecutar() {
-        if (frameCount % 40 === 0) {
-            let tam = random(35, 55);
-            this.cajas.push({ x: random(40, width - 80), y: -60, w: tam, h: tam, velY: random(2, 5), gravedad: 0.07 });
-        }
-
-        for (let i = this.cajas.length - 1; i >= 0; i--) {
-            let c = this.cajas[i];
-            c.velY += c.gravedad; // Físicas aceleradas estables
-            c.y += c.velY;
-
-            // Renderizado estilo neón decorado
-            fill(255, 140, 0);
-            stroke(255);
-            strokeWeight(2);
-            rect(c.x, c.y, c.w, c.h, 6);
-
-            if (c.y > height) { this.cajas.splice(i, 1); this.puntos = Math.max(0, this.puntos - 5); }
-        }
-
-        fill(255); noStroke(); textSize(24);
-        text(`Puntaje: ${this.puntos}`, 40, height - 40);
+    constructor() { this.cajas = []; this.pts = 0; }
+    iniciar() { this.cajas = []; this.pts = 0; }
+    actualizar() {
+        if (frameCount % 45 === 0) this.cajas.push({ x: random(50, width-100), y: -50, w: random(35,50), velY: random(2,4) });
+        this.cajas.forEach((c, i) => {
+            c.velY += 0.08; c.y += c.velY;
+            if (c.y > height) { this.cajas.splice(i, 1); this.pts = Math.max(0, this.pts - 5); }
+        });
     }
-
-    registrarTiro(tx, ty) {
+    dibujar() {
+        this.cajas.forEach(c => {
+            // Renderizado metálico con relieve realista
+            fill(230, 110, 0); stroke(255); strokeWeight(2); rect(c.x, c.y, c.w, c.w, 4);
+            fill(255, 50); noStroke(); rect(c.x + 3, c.y + 3, c.w - 6, 6);
+        });
+        fill(255); noStroke(); textSize(22); text(`Puntos: ${this.pts}`, 40, height - 40);
+    }
+    toque(tx, ty) {
         for (let i = this.cajas.length - 1; i >= 0; i--) {
             let c = this.cajas[i];
-            // Hitbox precisa cuadrada corregida
-            if (tx >= c.x && tx <= c.x + c.w && ty >= c.y && ty <= c.y + c.h) {
-                crearExplosionParticulas(c.x + c.w/2, c.y + c.h/2, [255, 140, 0]);
-                this.cajas.splice(i, 1);
-                this.puntos += 10;
-                break;
+            if (tx >= c.x && tx <= c.x + c.w && ty >= c.y && ty <= c.y + c.w) {
+                crearExplosionParticulas(c.x + c.w/2, c.y + c.w/2, [255, 120, 0]);
+                this.cajas.splice(i, 1); this.pts += 10; break;
             }
         }
     }
 }
 
-// --- LOGICA DEL MODO CAMPAÑA (COMPLETO) ---
+// --- MODO CAMPAÑA + ACCESO AL BOSS SECRETO ---
 class ControladorCampania {
-    constructor() { this.enemigoX = 0; this.enemigoY = 0; this.vidaEnemigo = 100; }
-    iniciar() { this.enemigoX = width / 2; this.enemigoY = height / 2 - 50; this.vidaEnemigo = 100; }
-    
-    ejecutar() {
-        // Renderizado del Boss de la campaña
-        push();
-        translate(this.enemigoX, this.enemigoY + sin(frameCount * 0.08) * 10);
-        fill(120, 20, 200);
-        stroke(255, 50, 50);
-        strokeWeight(3);
-        rect(-50, -50, 100, 100, 15);
+    constructor() { this.vida = 100; }
+    iniciar() { this.vida = 100; }
+    actualizar() { this.x = width/2; this.y = height/2 - 40; }
+    dibujar() {
+        push(); translate(this.x, this.y + sin(frameCount * 0.07) * 8);
         
-        // Barra de Vida estilizada del enemigo
-        fill(255, 0, 0); noStroke(); rect(-60, -70, 120, 10);
-        fill(0, 255, 0); rect(-60, -70, map(this.vidaEnemigo, 0, 100, 0, 120), 10);
+        // Renderizado del enemigo base de campaña (Maldición)
+        fill(90, 30, 160); stroke(255, 80, 80); strokeWeight(2); rect(-45, -45, 90, 90, 12);
+        fill(255, 0, 0); noStroke(); rect(-55, -65, 110, 8);
+        fill(0, 255, 100); rect(-55, -65, map(this.vida, 0, 100, 0, 110), 8);
         pop();
 
-        fill(255); textSize(20); textAlign(CENTER);
-        text("MODO CAMPAÑA: ¡Apacha al jefe maldito para derrotarlo!", width/2, height - 50);
+        // 🛑 BOTÓN OCULTO/SECRETO PARA ENTRAR AL BOSS FIGHT
+        fill(25, 25, 45, 120); stroke(255, 30);
+        rect(20, height - 70, 140, 45, 8);
+        fill(140, 140, 160); noStroke(); textSize(12); textAlign(LEFT);
+        text("?? GRIETA COSMICA ??", 32, height - 43);
     }
-
-    atacar(tx, ty) {
-        let d = dist(tx, ty, this.enemigoX, this.enemigoY);
-        if (d < 70) {
-            this.vidaEnemigo = Math.max(0, this.vidaEnemigo - 10);
-            crearExplosionParticulas(tx, ty, [120, 20, 200]);
-            if (this.vidaEnemigo <= 0) this.iniciar(); // Resucita con salud completa al ganar
+    toque(tx, ty) {
+        // Verificar si se presiona el botón secreto de la Grieta Cósmica
+        if (tx >= 20 && tx <= 160 && ty >= height - 70 && ty <= height - 25) {
+            crearExplosionParticulas(90, height - 47, [163, 51, 255]);
+            activarModoJuego('boss_secreto');
+            return;
+        }
+        if (dist(tx, ty, this.x, this.y) < 60) {
+            this.vida = Math.max(0, this.vida - 8);
+            crearExplosionParticulas(tx, ty, [140, 20, 220]);
+            if (this.vida <= 0) this.iniciar();
         }
     }
 }
 
-// --- ENRUTAMIENTOS DE INTERFAZ GENERAL ---
+// --- 👑 MODO: BOSS FIGHT SECRETO (SUKUNA EN FORMA REAL) ---
+class ControladorBossSecreto {
+    constructor() { this.vidaBoss = 250; this.fase = 1; this.escudo = 100; }
+    iniciar() { this.vidaBoss = 250; this.fase = 1; this.escudo = 100; }
+    actualizar() {
+        this.x = width / 2;
+        this.y = height / 2 - 60;
+        if (this.vidaBoss < 120) this.fase = 2; // Segunda fase del jefe secreto
+    }
+    dibujar() {
+        push();
+        translate(this.x, this.y + sin(frameCount * 0.12) * 15);
+        
+        // Aura apocalíptica del Jefe Secreto
+        let colA = this.fase === 1 ? [180, 0, 30] : [255, 0, 150];
+        fill(colA[0], colA[1], colA[2], 30 + sin(frameCount*0.1)*15);
+        ellipse(0, 0, 170, 170);
+        
+        // Cuerpo del Boss Secreto
+        fill(20, 20, 25); stroke(colA[0], colA[1], colA[2]); strokeWeight(4);
+        rect(-65, -65, 130, 130, 25);
+        
+        // Ojos carmesí del Rey de las Maldiciones
+        fill(255, 0, 50); noStroke();
+        ellipse(-25, -10, 16, 8); ellipse(25, -10, 16, 8);
+        if (this.fase === 2) { // Segundos ojos revelados en Fase 2
+            ellipse(-25, 10, 14, 6); ellipse(25, 10, 14, 6);
+        }
+        
+        // Interfaz de salud del Boss Secreto (Mega Barra Superior)
+        pop();
+        fill(20); rect(width/2 - 150, 40, 300, 16, 5);
+        fill(this.fase === 1 ? [200, 0, 40] : [255, 0, 128]);
+        rect(width/2 - 150, 40, map(this.vidaBoss, 0, 250, 0, 300), 16, 5);
+        
+        fill(255); textSize(14); textAlign(CENTER);
+        text(this.fase === 1 ? "SUKUNA: REY DE LAS MALDICIONES" : "SUKUNA: EVOLUCIÓN DESENCADENADA (FASE 2)", width/2, 30);
+    }
+    toque(tx, ty) {
+        let d = dist(tx, ty, this.x, this.y);
+        if (d < 85) {
+            let daño = this.fase === 1 ? 10 : 5; // En fase 2 tiene mucha más resistencia
+            this.vidaBoss = Math.max(0, this.vidaBoss - daño);
+            crearExplosionParticulas(tx, ty, this.fase === 1 ? [255, 0, 50] : [255, 200, 0]);
+            if (this.vidaBoss <= 0) {
+                volverAlMenuPrincipal(); // Volver al triunfar
+            }
+        }
+    }
+}
+
+// --- CONEXIONES DE NAVEGACIÓN DE INTERFAZ ---
 function activarModoJuego(modo) {
     modoActual = modo;
+    juegoPausado = false;
     document.getElementById("contenedor-menu").style.display = "none";
-    document.getElementById("btn-regresar").style.display = "block";
+    document.getElementById("menu-pausa").style.display = "none";
+    document.getElementById("btn-pausa").style.display = "block";
     
     if (modo === "ritmo") motorRitmo.iniciar();
     if (modo === "disparos") motorCajas.iniciar();
     if (modo === "campaña") motorCampaña.iniciar();
+    if (modo === "boss_secreto") motorBossSecreto.iniciar();
 }
 
 function volverAlMenuPrincipal() {
     modoActual = "menu";
+    juegoPausado = false;
     document.getElementById("contenedor-menu").style.display = "block";
-    document.getElementById("btn-regresar").style.display = "none";
+    document.getElementById("menu-pausa").style.display = "none";
+    document.getElementById("btn-pausa").style.display = "none";
 }
 
-// --- MANEJO DE EFECTOS ESPECIALES DE APALSAR (TOUCH) ---
+// --- MANEJO DE ENTRADAS TÁCTILES & ONDAS REALISTAS (APACHAR) ---
 function touchStarted() {
-    // 1. Crear onda de expansión realista en la zona del toque
-    ondasToque.push({ x: mouseX, y: mouseY, radio: 5, alfa: 255 });
+    if (juegoPausado) return false; // Bloquear toques si está en pausa
 
-    // 2. Gestionar interacciones de juego basadas en hitboxes
+    // Generar onda de distorsión al apachar la pantalla
+    ondasToque.push({ x: mouseX, y: mouseY, r: 8, a: 255 });
+
     if (modoActual === "menu") {
         let d = dist(mouseX, mouseY, width / 2, height / 2 - 60);
         if (d < 65) {
             idxSkin = (idxSkin + 1) % nombresSkins.length;
             skinActiva = nombresSkins[idxSkin];
-            crearExplosionParticulas(mouseX, mouseY, SKINS[skinActiva].colorPrimario);
+            crearExplosionParticulas(mouseX, mouseY, SKINS[skinActiva].brillo);
         }
     } else if (modoActual === "ritmo") {
-        motorRitmo.chequearToque();
+        motorRitmo.toque();
     } else if (modoActual === "disparos") {
-        motorCajas.registrarTiro(mouseX, mouseY);
+        motorCajas.toque(mouseX, mouseY);
     } else if (modoActual === "campaña") {
-        motorCampaña.atacar(mouseX, mouseY);
+        motorCampaña.toque(mouseX, mouseY);
+    } else if (modoActual === "boss_secreto") {
+        motorBossSecreto.toque(mouseX, mouseY);
     }
     return false;
 }
 
-// Generador modular de explosiones de partículas decorativas
-function crearExplosionParticulas(x, y, colorBase) {
-    for (let i = 0; i < 15; i++) {
-        particulasEnergia.push({
-            x: x, y: y,
-            vx: random(-4, 4), vy: random(-4, 4),
-            r: random(4, 8), col: colorBase, alfa: 255
-        });
+// --- SISTEMAS DE EFECTOS ESPECIALES FLUIDOS ---
+function crearExplosionParticulas(x, y, colB) {
+    for (let i = 0; i < 20; i++) {
+        particulasEnergia.push({ x: x, y: y, vx: random(-5, 5), vy: random(-5, 5), r: random(5, 9), c: colB, a: 255 });
     }
 }
 
 function actualizarParticulas() {
     for (let i = particulasEnergia.length - 1; i >= 0; i--) {
-        let p = particulasEnergia[i];
-        p.x += p.vx; p.y += p.vy;
-        p.alfa -= 6; p.r *= 0.96;
-        
-        if (p.alfa <= 0) { particulasEnergia.splice(i, 1); continue; }
-        
-        fill(p.col[0], p.col[1], p.col[2], p.alfa);
-        noStroke();
-        ellipse(p.x, p.y, p.r, p.r);
+        let p = particulasEnergia[i]; p.x += p.vx; p.y += p.vy; p.a -= 6; p.r *= 0.95;
+        if (p.a <= 0) particulasEnergia.splice(i, 1);
     }
 }
 
-function actualizarOndasToque() {
+function dibujarParticulas() {
+    particulasEnergia.forEach(p => {
+        fill(p.c[0], p.c[1], p.c[2], p.a); noStroke();
+        ellipse(p.x, p.y, p.r, p.r);
+    });
+}
+
+function actualizarYRenderizarOndas() {
     for (let i = ondasToque.length - 1; i >= 0; i--) {
         let o = ondasToque[i];
-        o.radio += 4; o.alfa -= 7;
+        if (!juegoPausado) { o.r += 4; o.a -= 6; }
+        if (o.a <= 0) { ondasToque.splice(i, 1); continue; }
         
-        if (o.alfa <= 0) { ondasToque.splice(i, 1); continue; }
-        
-        stroke(255, o.alfa);
-        strokeWeight(2);
-        noFill();
-        ellipse(o.x, o.y, o.radio, o.radio);
+        stroke(255, o.a); strokeWeight(2.5); noFill();
+        ellipse(o.x, o.y, o.r, o.r);
     }
 }
 
