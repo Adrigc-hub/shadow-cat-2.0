@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SHADOW CAT: COLD REBOOT</title>
+    <title>SHADOW CAT: PERSISTENT MATRIX</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -12,6 +12,26 @@
             overflow: hidden; user-select: none; -webkit-user-select: none;
             touch-action: none;
         }
+        /* Pantalla de Carga Matemática */
+        #pantalla-carga {
+            position: absolute; width: 100%; height: 100%;
+            background: #010103; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 200;
+        }
+        .barra-progreso-contenedor {
+            width: 70%; max-width: 300px; height: 6px;
+            background: #111122; border-radius: 3px; overflow: hidden; margin-top: 15px;
+            border: 1px solid #222;
+        }
+        #barra-progreso-linea {
+            width: 0%; height: 100%; background: #9000c7;
+            box-shadow: 0 0 10px #a333ff; transition: width 0.1s linear;
+        }
+        #texto-matematico {
+            font-family: 'Courier New', Courier, monospace; font-size: 11px;
+            color: #00ffcc; margin-top: 10px; min-height: 15px; text-align: center;
+        }
+
         .pantalla {
             position: absolute; width: 100%; height: 100%;
             display: none; flex-direction: column;
@@ -47,7 +67,6 @@
             background: #ffcc00; color: black; border: none;
             padding: 8px 14px; border-radius: 5px; font-weight: bold; cursor: pointer;
         }
-        .btn-comprar.adquirido { background: #00ff66; }
 
         #hud-juego {
             position: absolute; top: 15px; left: 0; width: 100%;
@@ -58,7 +77,7 @@
         .stats-hud {
             color: white; font-size: 13px; font-weight: bold;
             text-shadow: 1px 1px 2px black; pointer-events: auto;
-            background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 6px;
+            background: rgba(0,0,0,0.7); padding: 8px 12px; border-radius: 6px;
             border: 1px solid #222;
         }
         .btn-pausa {
@@ -91,12 +110,20 @@
         <source src="https://audio.jofre.de/stayinsideme.mp3" type="audio/mp3">
     </audio>
 
+    <div id="pantalla-carga">
+        <div style="font-weight: bold; font-size: 14px; letter-spacing: 3px; color: #a333ff;">COMPILING SHADOW_CAT_SYSTEM</div>
+        <div class="barra-progreso-contenedor">
+            <div id="barra-progreso-linea"></div>
+        </div>
+        <div id="texto-matematico">f(x) = sin(θ) * static_cast<float>(core_matrix)</div>
+    </div>
+
     <canvas id="canvasJuego"></canvas>
 
     <div id="btn-purpura" onclick="detonarIlimitadoPurpura()">PÚRPURA</div>
 
     <div id="hud-juego">
-        <div class="stats-hud" id="txt-hud-stats">Cargando...</div>
+        <div class="stats-hud" id="txt-hud-stats">Iniciando...</div>
         <button class="btn-pausa" onclick="activarPausa(true)">⏸ PAUSA</button>
     </div>
 
@@ -108,28 +135,21 @@
         </div>
     </div>
 
-    <div id="pantalla-menu" class="pantalla activa">
-        <h1 class="titulo-principal">SHADOW CAT 2.6</h1>
-        <div class="subtitulo">Controles Táctiles Calibrados & Modos Completos</div>
-        <div class="marcador-puntos">Puntos Guardados: <span id="txt-puntos">100</span> PTS</div>
+    <div id="pantalla-menu" class="pantalla">
+        <h1 class="titulo-principal">SHADOW CAT 3.0</h1>
+        <div class="subtitulo">True Cat Physics & PERSISTENT DATA</div>
+        <div class="marcador-puntos">Mis Puntos Guardados: <span id="txt-puntos">0</span> PTS</div>
         
         <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-original')">Modo Arena (Original)</button>
         <button class="btn-menu btn-verde" onclick="cambiarPantalla('juego-ritmo')">Dance of Fire and Ice</button>
-        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-shoot')">Shoot the Box Pro</button>
+        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-shoot')">Shoot the Box Remastered</button>
         <button class="btn-menu btn-rosa" onclick="cambiarPantalla('hechiceros')">Skins de Gatos</button>
-        <button class="btn-menu btn-morado" onclick="cambiarPantalla('tienda')">Tienda</button>
     </div>
 
     <div id="pantalla-hechiceros" class="pantalla">
-        <h2>SKINS DE GATOS</h2>
+        <h2>CAMBIAR SKIN</h2>
         <div class="lista-tienda" id="contenedor-hechiceros"></div>
         <button class="btn-menu btn-rosa" onclick="cambiarPantalla('menu')">Volver</button>
-    </div>
-
-    <div id="pantalla-tienda" class="pantalla">
-        <h2>TIENDA DE ITEMS</h2>
-        <div class="lista-tienda" id="contenedor-tienda"></div>
-        <button class="btn-menu btn-morado" onclick="cambiarPantalla('menu')">Volver</button>
     </div>
 
     <script src="sketch.js"></script>
