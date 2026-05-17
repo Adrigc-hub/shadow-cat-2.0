@@ -24,3 +24,4 @@ V1.16: fixed a bug on the main menu.
 V1.17: added builder, online levels and some skills. 
 V1.18: MASSIVE secret update. 
 V1.19: added songs and more things to the editor. 
+V2.00: made the normal gamemode better
