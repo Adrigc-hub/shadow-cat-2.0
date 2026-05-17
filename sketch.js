@@ -1,28 +1,29 @@
 // --- CONFIGURACIÓN PRINCIPAL ---
 let puntosAcumulados = 0;
-let modoActual = "carga"; // Ahora inicia en carga neón, pero controlada por código
+let modoActual = "carga"; 
 let juegoPausado = false;
 let skinEquipada = "Default Cat";
 let audioCtx = null;
 let nodoMusicaMenu = null;
-let nodoRespiracion = null; // Nodo para el sonido de respiración/ambiente
 
+// Configuración detallada de apariencia para transformar el personaje en gato real
 const SKINS_GATOS = {
-    "Default Cat": { principal: "#d2691e", pecho: "#ffffff", ojos: "#00ff00", aura: "rgba(255,255,255,0.15)" },
-    "Gojo Satoru": { principal: "#0f031a", pecho: "#1a082e", ojos: "#00d2ff", aura: "rgba(0,210,255,0.3)" },
-    "Yuji Itadori": { principal: "#260606", pecho: "#400d0d", ojos: "#ff3c3c", aura: "rgba(255,60,60,0.3)" }
+    "Default Cat": { principal: "#d2691e", pecho: "#ffffff", ojos: "#00ff00", tipo: "default" },
+    "Gojo Satoru": { principal: "#ffffff", pecho: "#121214", ojos: "#00d2ff", tipo: "gojo" },
+    "Yuji Itadori": { principal: "#ff9494", pecho: "#260606", ojos: "#black", tipo: "yuji" }
 };
 
 // Atributos del Jugador
-let jugadorX = 200, jugadorY = 400, jugadorHP = 10;
+let jugadorX = 200, jugadorY = 400, jugadorHP = 30; // Vida sincronizada a 30 HP
 let misBalas = [], objetivosOriginales = [], balasCaendo = [];
 let estrellasFondo = [], puntosPartida = 0;
 
-// Estado del Boss
-let miniBossActivo = false;
-let miniBossHP = 20;
-let miniBossX = 200, miniBossY = 90, miniBossVX = 1.5;
-let tiempoInicioPartida = 0;
+// Estado del Boss (Corregido para colisiones y muerte real)
+let miniBossActivo = true; 
+let miniBossHP = 100; // 100 HP para el jefe Sukuna
+let miniBossMaxHP = 100;
+let miniBossX = 200, miniBossY = 90, miniBossVX = 2;
+let jefeHitTimer = 0;
 
 // Mecánicas Dance of Fire
 let bloquesRitmo = [];
@@ -31,16 +32,10 @@ let fuegoX = 0, fuegoY = 0, hieloX = 0, hieloY = 0, anguloPlaneta = 0;
 let pivoteFuego = true; 
 let camaraScrollX = 0, camaraScrollY = 0;
 
-// Mecánicas Shoot the Box
-let listaCajasShoot = [];
-let cargandoTiroShoot = false;
-let inicioToqueX = 0, inicioToqueY = 0;
-let arrastreX = 0, arrastreY = 0;
-let tiempoUltimaCajaShoot = 0;
-
-// Variables de la Pantalla de Carga y Efectos Solicitados
+// Variables de Carga y Construcción Neón
 let progresoCarga = 0;
 let rayosConstruccion = [];
+let botonesMenu = [];
 let tiempoInicioMenu = 0;
 
 const canvas = document.getElementById("canvasJuego");
@@ -49,12 +44,25 @@ const ctx = canvas.getContext("2d");
 function redimensionar() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    actualizarPosicionesBotones();
 }
 window.addEventListener('resize', redimensionar);
 
+function actualizarPosicionesBotones() {
+    let cx = canvas.width / 2;
+    let cy = canvas.height / 2;
+    // Definimos las coordenadas exactas de las cajas en el Canvas
+    botonesMenu = [
+        { id: "juego-original", texto: "MODO ORIGINAL", x: cx - 130, y: cy - 60, w: 260, h: 45, escala: 0 },
+        { id: "juego-ritmo", texto: "DANCE OF FIRE", x: cx - 130, y: cy + 10, w: 260, h: 45, escala: 0 },
+        { id: "juego-shoot", texto: "SHOOT THE BOX", x: cx - 130, y: cy + 80, w: 260, h: 45, escala: 0 },
+        { id: "hechiceros", texto: "HECHICEROS (SKINS)", x: cx - 130, y: cy + 150, w: 260, h: 45, escala: 0 }
+    ];
+}
+
 function generarEstrellas() {
     estrellasFondo = [];
-    for(let i=0; i<50; i++) {
+    for(let i=0; i<40; i++) {
         estrellasFondo.push({ x: Math.random()*window.innerWidth, y: Math.random()*window.innerHeight, size: Math.random()*2+1 });
     }
 }
@@ -66,84 +74,50 @@ function cargarProgresoGuardado() {
         puntosAcumulados = json.puntos || 0;
         skinEquipada = json.skin || "Default Cat";
     }
-    let txtPuntos = document.getElementById("txt-puntos");
-    if(txtPuntos) txtPuntos.innerText = puntosAcumulados;
 }
 
 function guardarProgresoLocal() {
     localStorage.setItem("SHADOW_CAT_SAVE_3", JSON.stringify({ puntos: puntosAcumulados, skin: skinEquipada }));
 }
 
-// --- SINTETIZADOR DE AUDIO AVANZADO (MÚSICA + RESPIRACIÓN NATIVA) ---
+// --- AUDIO AUTOMÁTICO ---
 function inicializarAudioNativo() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        gestionarMusicaEstados();
+        if (modoActual === "menu") gestionarMusicaEstados();
         crearEfectoRespiracionGato();
     }
 }
 
-// Genera un pulso sónico cíclico de baja frecuencia para simular respiración de energía maldita
 function crearEfectoRespiracionGato() {
     if(!audioCtx) return;
-    
     let osc = audioCtx.createOscillator();
-    let filtro = audioCtx.createBiquadFilter();
-    let gananciaRespiracion = audioCtx.createGain();
-
+    let gain = audioCtx.createGain();
     osc.type = "sine";
-    osc.frequency.setValueAtTime(60, audioCtx.currentTime); // Frecuencia sub-grave baja
-
-    filtro.type = "lowpass";
-    filtro.frequency.setValueAtTime(120, audioCtx.currentTime);
-
-    gananciaRespiracion.gain.setValueAtTime(0.01, audioCtx.currentTime);
-
-    osc.connect(filtro);
-    filtro.connect(gananciaRespiracion);
-    gananciaRespiracion.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(50, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+    osc.connect(gain); gain.connect(audioCtx.destination);
     osc.start();
-
-    // Ciclo infinito automatizado de inhalación/exhalación (Cambio de volumen de aire)
     setInterval(() => {
         if(audioCtx && !juegoPausado) {
             let t = audioCtx.currentTime;
-            // Inhala (Sube volumen y frecuencia sutilmente)
-            gananciaRespiracion.gain.linearRampToValueAtTime(0.04, t + 1.8);
-            filtro.frequency.linearRampToValueAtTime(200, t + 1.8);
-            
-            // Exhala (Baja volumen y frecuencia)
-            gananciaRespiracion.gain.linearRampToValueAtTime(0.01, t + 3.6);
-            filtro.frequency.linearRampToValueAtTime(100, t + 3.6);
+            gain.gain.linearRampToValueAtTime(0.03, t + 1.5); // Simulación de inhalar energía
+            gain.gain.linearRampToValueAtTime(0.01, t + 3.0); // Exhalar
         }
-    }, 3600);
+    }, 3000);
 }
 
 function gestionarMusicaEstados() {
     if (!audioCtx) return;
-
     if (modoActual === "menu" && !nodoMusicaMenu) {
         nodoMusicaMenu = audioCtx.createOscillator();
         let gainNode = audioCtx.createGain();
-        let delayNode = audioCtx.createDelay();
-        let feedback = audioCtx.createGain();
-
-        nodoMusicaMenu.type = "sine";
-        nodoMusicaMenu.frequency.setValueAtTime(146.83, audioCtx.currentTime); 
-
-        delayNode.delayTime.value = 0.4;
-        feedback.gain.value = 0.5;
-        gainNode.gain.setValueAtTime(0.03, audioCtx.currentTime);
-
-        nodoMusicaMenu.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        gainNode.connect(delayNode);
-        delayNode.connect(feedback);
-        feedback.connect(delayNode);
-        delayNode.connect(audioCtx.destination);
+        nodoMusicaMenu.type = "triangle";
+        nodoMusicaMenu.frequency.setValueAtTime(130.81, audioCtx.currentTime); 
+        gainNode.gain.setValueAtTime(0.02, audioCtx.currentTime);
+        nodoMusicaMenu.connect(gainNode); gainNode.connect(audioCtx.destination);
         nodoMusicaMenu.start();
-    } 
-    else if (modoActual !== "menu" && nodoMusicaMenu) {
+    } else if (modoActual !== "menu" && nodoMusicaMenu) {
         try { nodoMusicaMenu.stop(); } catch(e){}
         nodoMusicaMenu = null;
     }
@@ -153,159 +127,93 @@ function playSound(tipo) {
     if (!audioCtx) return;
     let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain();
     osc.connect(gain); gain.connect(audioCtx.destination);
-
     if (tipo === "click" || tipo === "hit") {
-        osc.type = "sine"; osc.frequency.setValueAtTime(550, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.08);
-    } else if (tipo === "rayo_carga") {
-        osc.type = "triangle"; osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(500, audioCtx.currentTime + 0.05);
-        gain.gain.setValueAtTime(0.015, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.06);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.06);
+        osc.type = "sine"; osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.05);
     }
 }
 
 function cambiarPantalla(destino) {
-    let pMenu = document.getElementById("pantalla-menu");
     let pHech = document.getElementById("pantalla-hechiceros");
     let hud = document.getElementById("hud-juego");
 
-    if(pMenu) pMenu.classList.remove("activa");
-    if(pHech) pHech.classList.remove("activa");
+    if(pHech) pHech.style.display = "none";
     if(hud) hud.style.display = "none";
 
-    juegoPausado = false; miniBossActivo = false;
-    puntosPartida = 0; jugadorHP = 10;
-    camaraScrollX = 0; camaraScrollY = 0;
+    juegoPausado = false;
+    puntosPartida = 0; jugadorHP = 30;
 
     if (destino === 'menu') {
         modoActual = "menu";
         tiempoInicioMenu = Date.now();
         gestionarMusicaEstados();
-        if(pMenu) pMenu.classList.add("activa");
     } else if (destino === 'hechiceros') {
-        if(pHech) pHech.classList.add("activa");
+        modoActual = "hechiceros";
+        if(pHech) pHech.style.display = "flex";
         renderSkins();
     } else {
-        modoActual = "accion";
+        modoActual = destino;
         gestionarMusicaEstados(); 
         if(hud) hud.style.display = "flex";
         jugadorX = canvas.width / 2; jugadorY = canvas.height - 130;
         misBalas = []; objetivosOriginales = []; balasCaendo = [];
-        tiempoInicioPartida = Date.now();
+        miniBossHP = 100; miniBossActivo = true;
 
-        if (destino === 'juego-original') modoActual = "original";
-        if (destino === 'juego-ritmo') { modoActual = "ritmo"; generarCaminoBloquesRitmo(); }
-        if (destino === 'juego-shoot') {
-            modoActual = "shoot";
-            jugadorX = canvas.width / 2; jugadorY = canvas.height - 100;
-            listaCajasShoot = []; tiempoUltimaCajaShoot = Date.now();
-        }
+        if (destino === 'juego-ritmo') generarCaminoBloquesRitmo();
     }
 }
 
-function activarPausa(estado) {
-    juegoPausado = estado;
-    let mPausa = document.getElementById("menu-pausa");
-    if(mPausa) mPausa.style.display = estado ? "flex" : "none";
-}
-
-function volverAlMenuPrincipal() {
-    puntosAcumulados += puntosPartida;
-    let txtPuntos = document.getElementById("txt-puntos");
-    if(txtPuntos) txtPuntos.innerText = puntosAcumulados;
-    guardarProgresoLocal(); activarPausa(false); cambiarPantalla('menu');
-}
-
-// --- EVENTOS DE ENTRADA ---
+// --- DETECCIÓN DE TOQUES (MÓVIL / CANVAS DIRECTO) ---
 window.addEventListener('pointerdown', (e) => {
     inicializarAudioNativo();
     if (juegoPausado) return;
-    
-    // Si da clic durante la carga neón, puede saltarla o inicializar el sonido
+
     if (modoActual === "carga" && progresoCarga >= 100) {
         cambiarPantalla('menu');
         return;
     }
-    if (modoActual === "menu") return;
 
-    if (modoActual === "original") {
-        playSound("click");
-        misBalas.push({ x: jugadorX, y: jugadorY - 25, vy: -12 });
-    }
-
-    if (modoActual === "ritmo") {
-        let proximoBloque = bloquesRitmo[indiceBloqueActual + 1];
-        if (proximoBloque) {
-            let actualEsferaX = pivoteFuego ? hieloX : fuegoX;
-            let actualEsferaY = pivoteFuego ? hieloY : fuegoY;
-            let dist = Math.sqrt(Math.pow(actualEsferaX - proximoBloque.x, 2) + Math.pow(actualEsferaY - proximoBloque.y, 2));
-
-            if (dist <= 55) { 
-                indiceBloqueActual++; 
-                puntosPartida += 10; 
+    // Gestionar clicks en los botones nativos del Canvas en el Menú
+    if (modoActual === "menu") {
+        botonesMenu.forEach(btn => {
+            if (e.clientX >= btn.x && e.clientX <= btn.x + btn.w && e.clientY >= btn.y && e.clientY <= btn.y + btn.h) {
                 playSound("click");
-                
-                if (pivoteFuego) {
-                    fuegoX = proximoBloque.x; fuegoY = proximoBloque.y;
-                    pivoteFuego = false;
-                } else {
-                    hieloX = proximoBloque.x; hieloY = proximoBloque.y;
-                    pivoteFuego = true;
-                }
-                anguloPlaneta = Math.PI; 
-                
-                if (indiceBloqueActual >= bloquesRitmo.length - 1) {
-                    alert("¡Ritmo dominado!"); 
-                    volverAlMenuPrincipal();
-                }
-            } else {
-                setTimeout(() => { alert("¡Fallo de ritmo!"); volverAlMenuPrincipal(); }, 200);
+                cambiarPantalla(btn.id);
             }
-        }
+        });
+        return;
     }
 
-    if (modoActual === "shoot") {
-        if (Math.sqrt(Math.pow(e.clientX - jugadorX, 2) + Math.pow(e.clientY - jugadorY, 2)) < 50) {
-            cargandoTiroShoot = true; inicioToqueX = e.clientX; inicioToqueY = e.clientY; arrastreX = e.clientX; arrastreY = e.clientY;
-        }
+    if (modoActual === "juego-original") {
+        playSound("click");
+        misBalas.push({ x: jugadorX, y: jugadorY - 30, vy: -14 });
     }
 });
 
 window.addEventListener('pointermove', (e) => {
     if (juegoPausado || modoActual === "menu" || modoActual === "carga") return;
-    if (modoActual === "original" || modoActual === "ritmo") jugadorX = Math.max(30, Math.min(canvas.width - 30, e.clientX));
-    if (modoActual === "shoot" && cargandoTiroShoot) { arrastreX = e.clientX; arrastreY = e.clientY; }
-});
-
-window.addEventListener('pointerup', () => {
-    if (modoActual === "shoot" && cargandoTiroShoot) {
-        cargandoTiroShoot = false;
-        misBalas.push({ x: jugadorX, y: jugadorY - 15, vx: (inicioToqueX - arrastreX) * 0.18, vy: (inicioToqueY - arrastreY) * 0.18, tipo: "shootbox" });
-    }
+    jugadorX = Math.max(30, Math.min(canvas.width - 30, e.clientX));
 });
 
 function generarCaminoBloquesRitmo() {
     bloquesRitmo = []; indiceBloqueActual = 0; 
     let cx = window.innerWidth / 2 - 100; let cy = window.innerHeight / 2 + 100;
-    for(let i=0; i<30; i++) { 
-        bloquesRitmo.push({ x: cx, y: cy }); cx += 120; 
-        if(i % 4 === 0 && i > 0) cy += (Math.random() > 0.5 ? 100 : -100); 
+    for(let i=0; i<20; i++) { 
+        bloquesRitmo.push({ x: cx, y: cy }); cx += 100; 
     }
     fuegoX = bloquesRitmo[0].x; fuegoY = bloquesRitmo[0].y; 
-    hieloX = fuegoX + 65; hieloY = fuegoY; pivoteFuego = true; anguloPlaneta = 0;
+    hieloX = fuegoX + 50; hieloY = fuegoY; pivoteFuego = true; anguloPlaneta = 0;
 }
 
-// --- LOOP PRINCIPAL DE RENDERIZADO ---
+// --- SISTEMA DE DIBUJO CARDINAL ---
 function buclePrincipal() {
     ctx.fillStyle = "#020205"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Fondo estelar universal
-    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    // Estrellas
+    ctx.fillStyle = "rgba(255,255,255,0.15)";
     estrellasFondo.forEach(st => { ctx.fillRect(st.x, st.y, st.size, st.size); });
 
     if (modoActual === "carga") {
@@ -313,228 +221,215 @@ function buclePrincipal() {
     } else if (modoActual === "menu") {
         dibujarGatoEnBancaMenu();
         animarLineasConstruccionMenu(); 
-    } else if (!juegoPausado) {
-        if (modoActual === "original") actualizarModoOriginal();
-        else if (modoActual === "ritmo") actualizarModoRitmo();
-        else if (modoActual === "shoot") actualizarModoShoot();
-
-        if (jugadorHP <= 0) { alert("Gato Derrotado."); volverAlMenuPrincipal(); }
+    } else if (modoActual === "juego-original") {
+        actualizarModoOriginal();
     }
 
-    if (modoActual !== "menu" && modoActual !== "ritmo" && modoActual !== "carga") {
-        dibujarGatoReal(jugadorX, jugadorY);
+    if (modoActual !== "menu" && modoActual !== "carga" && modoActual !== "hechiceros") {
+        dibujarGatoEstilizado(jugadorX, jugadorY, skinEquipada);
     }
 
     requestAnimationFrame(buclePrincipal);
 }
 
-// --- NUEVA PANTALLA DE CARGA NEÓN INTEGRADA EFECTIVA ---
+// --- PANTALLA DE CARGA ---
 function dibujarPantallaCargaNeon() {
     let cx = canvas.width / 2;
     let cy = canvas.height / 2;
 
-    // Aumentar progreso de carga fluidamente
-    if (progresoCarga < 100) {
-        progresoCarga += 1.2;
-    }
+    if (progresoCarga < 100) progresoCarga += 1.5;
 
-    // Efecto de rayos neón aleatorios directo en el lienzo
-    if (Math.random() < 0.15) {
-        playSound("rayo_carga");
+    // Los rayos caen y guardan las coordenadas de los botones del menú para "construirlos"
+    if (Math.random() < 0.2 && progresoCarga < 100) {
+        let botonDestino = botonesMenu[Math.floor(Math.random() * botonesMenu.length)];
         rayosConstruccion.push({
             x1: Math.random() * canvas.width, y1: 0,
-            x2: cx + (Math.random() - 0.5) * 300, y2: cy,
+            x2: botonDestino.x + Math.random() * botonDestino.w,
+            y2: botonDestino.y + Math.random() * botonDestino.h,
             alfa: 1.0
         });
     }
 
-    // Dibujar rayos activos
     rayosConstruccion.forEach((r, idx) => {
         ctx.strokeStyle = `rgba(0, 255, 130, ${r.alfa})`;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); ctx.stroke();
-        r.alfa -= 0.1;
+        r.alfa -= 0.08;
         if(r.alfa <= 0) rayosConstruccion.splice(idx, 1);
     });
 
-    // Marco del Contenedor de Carga
     ctx.strokeStyle = "rgba(0, 255, 130, 0.2)";
-    ctx.strokeRect(cx - 150, cy + 50, 300, 20);
-
-    // Barra Neón de Progreso
+    ctx.strokeRect(cx - 130, cy + 50, 260, 15);
     ctx.fillStyle = "#00ff82";
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = "#00ff82";
-    ctx.fillRect(cx - 150, cy + 50, 3 * progresoCarga, 20);
-    ctx.shadowBlur = 0; // Reset de sombra para optimizar rendimiento
+    ctx.fillRect(cx - 130, cy + 50, 2.6 * progresoCarga, 15);
 
-    // Textos Matriciales de Carga
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 18px Courier New";
+    ctx.font = "bold 16px Courier New";
     ctx.textAlign = "center";
-    ctx.fillText(`COMPILING ENGINES: ${Math.floor(progresoCarga)}%`, cx, cy - 20);
+    ctx.fillText(`COMPILING GEOMETRY_CORE`, cx, cy - 10);
+    ctx.font = "12px Courier New";
+    ctx.fillStyle = "#00ff82";
+    ctx.fillText(`f(x) = sin(θ) * core_matrix`, cx, cy + 25);
 
-    ctx.font = "11px Courier New";
-    ctx.fillStyle = "rgba(0,255,130,0.7)";
-    ctx.fillText("CONECTANDO COMPONENTES EXPANSIONES DE DOMINIO...", cx, cy + 100);
-
-    // Auto-salto al terminar la carga
     if (progresoCarga >= 100) {
         cambiarPantalla('menu');
     }
 }
 
-// --- ANIMACIÓN GATO EN BANCA MUEVE-COLA ---
+// --- DIBUJAR LOS RECTÁNGULOS Y TEXTOS EN EL CANVAS (CORREGIDO) ---
+function animarLineasConstruccionMenu() {
+    let transcurrido = Date.now() - tiempoInicioMenu;
+    let pct = Math.min(1, transcurrido / 800); 
+
+    botonesMenu.forEach((btn) => {
+        let anchoAnimado = btn.w * pct;
+        
+        // Caja de borde verde neón exacta a la foto
+        ctx.strokeStyle = "#00ff82";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(btn.x + (btn.w - anchoAnimado)/2, btn.y, anchoAnimado, btn.h);
+
+        // Si la caja ya terminó de expandirse por el rayo, pintamos el texto adentro
+        if (pct >= 1) {
+            ctx.fillStyle = "#00ff82";
+            ctx.font = "bold 13px Courier New";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(btn.texto, btn.x + btn.w / 2, btn.y + btn.h / 2);
+        }
+    });
+}
+
+// --- BANCA ---
 function dibujarGatoEnBancaMenu() {
     let cx = canvas.width / 2;
-    let cy = canvas.height / 2 - 140; 
+    let cy = canvas.height / 2 - 130; 
 
-    ctx.fillStyle = "#7a431d";
-    ctx.fillRect(cx - 70, cy + 30, 140, 10); 
-    ctx.fillStyle = "#5c3214";
-    ctx.fillRect(cx - 60, cy + 40, 8, 25);   
-    ctx.fillRect(cx + 52, cy + 40, 8, 25);   
-    ctx.fillRect(cx - 65, cy + 10, 6, 20);   
-    ctx.fillRect(cx + 59, cy + 10, 6, 20);   
+    // Dibujo de la banca de madera
+    ctx.fillStyle = "#7a431d"; ctx.fillRect(cx - 70, cy + 30, 140, 10); 
+    ctx.fillStyle = "#5c3214"; ctx.fillRect(cx - 60, cy + 40, 8, 25); ctx.fillRect(cx + 52, cy + 40, 8, 25);   
+    ctx.fillRect(cx - 65, cy + 10, 6, 20); ctx.fillRect(cx + 59, cy + 10, 6, 20);   
     ctx.fillRect(cx - 70, cy, 140, 12);      
 
-    let anguloCola = Math.sin(Date.now() * 0.007) * 0.45;
-    let s = SKINS_GATOS[skinEquipada] || SKINS_GATOS["Default Cat"];
-
-    ctx.fillStyle = s.aura; ctx.beginPath(); ctx.arc(cx, cy + 10, 35, 0, Math.PI*2); ctx.fill();
-
-    ctx.save();
-    ctx.translate(cx - 12, cy + 24);
-    ctx.rotate(anguloCola);
-    ctx.strokeStyle = s.principal;
-    ctx.lineWidth = 5;
-    ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-15, -10, -20, -25); ctx.stroke();
-    ctx.restore();
-
-    ctx.fillStyle = s.principal;
-    ctx.beginPath(); ctx.arc(cx, cy + 10, 14, 0, Math.PI*2); ctx.fill(); 
-    ctx.fillStyle = s.pecho;
-    ctx.beginPath(); ctx.ellipse(cx, cy + 26, 11, 10, 0, 0, Math.PI*2); ctx.fill(); 
-
-    ctx.fillStyle = s.principal;
-    ctx.beginPath(); ctx.moveTo(cx - 12, cy); ctx.lineTo(cx - 14, cy - 10); ctx.lineTo(cx - 4, cy - 4); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(cx + 12, cy); ctx.lineTo(cx + 14, cy - 10); ctx.lineTo(cx + 4, cy - 4); ctx.fill();
-
-    ctx.fillStyle = s.ojos;
-    ctx.fillRect(cx - 5, cy + 5, 3, 5); ctx.fillRect(cx + 3, cy + 5, 3, 5);
+    // Gato sobre la banca
+    dibujarGatoEstilizado(cx, cy + 25, skinEquipada);
 }
 
-// --- RECTÁNGULOS DE BOTONES COLOCÁNDOSE EN SU LUGAR (ANIMACIÓN MENÚ) ---
-function animarLineasConstruccionMenu() {
-    let cx = canvas.width / 2;
-    let cy = canvas.height / 2;
+// --- GENERADOR DE SKIN EN FORMATO GATO REAL (CORREGIDO) ---
+function dibujarGatoEstilizado(x, y, nombreSkin) {
+    let data = SKINS_GATOS[nombreSkin] || SKINS_GATOS["Default Cat"];
     
-    let transcurrido = Date.now() - tiempoInicioMenu;
-    let pct = Math.min(1, transcurrido / 1000); // 1 segundo exacto de acomodo
+    ctx.save();
+    // Orejas de gato
+    ctx.fillStyle = data.principal;
+    ctx.beginPath(); ctx.moveTo(x - 14, y - 20); ctx.lineTo(x - 18, y - 35); ctx.lineTo(x - 4, y - 24); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + 14, y - 20); ctx.lineTo(x + 18, y - 35); ctx.lineTo(x + 4, y - 24); ctx.fill();
 
-    ctx.lineWidth = 2;
-    let posicionesY = [cy - 60, cy + 10, cy + 80];
-    let anchoCaja = 260;
-    let progresoAncho = anchoCaja * pct;
+    // Cabeza y Cuerpo de gato
+    ctx.beginPath(); ctx.arc(x, y - 14, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = data.pecho;
+    ctx.beginPath(); ctx.ellipse(x, y + 4, 10, 14, 0, 0, Math.PI * 2); ctx.fill();
 
-    posicionesY.forEach((y, i) => {
-        ctx.strokeStyle = "rgba(0, 255, 130, 0.85)";
-        ctx.save();
-        ctx.beginPath();
-        // Las cajas se expanden limpiamente desde el centro geométrico del botón hacia afuera
-        ctx.strokeRect(cx - progresoAncho / 2, y, progresoAncho, 45);
-        ctx.restore();
-    });
-}
-
-// --- DETALLES DE MODOS DE JUEGO ---
-function actualizarModoOriginal() {
-    if (Math.random() < 0.02) objetivosOriginales.push({ x: Math.random() * (canvas.width - 50), y: -40 });
-    if (Math.random() < 0.025) balasCaendo.push({ x: Math.random() * canvas.width, y: -20, vy: 3 });
-
-    if (Date.now() - tiempoInicioPartida > 8000 && !miniBossActivo) {
-        miniBossActivo = true; miniBossHP = 20; miniBossX = canvas.width / 2;
+    // Rostro personalizado según hechicero
+    if (data.tipo === "gojo") {
+        // Venda de ojos negra de Gojo Satoru
+        ctx.fillStyle = "#16161a";
+        ctx.fillRect(x - 14, y - 18, 28, 7);
+        // Destello de ojos infinitos abajo de la venda
+        ctx.fillStyle = "#00ffff";
+        ctx.fillRect(x - 8, y - 11, 4, 3); ctx.fillRect(x + 4, y - 11, 4, 3);
+    } else if (data.tipo === "yuji") {
+        // Ojos y marcas faciales de Sukuna/Yuji
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(x - 8, y - 16, 4, 4); ctx.fillRect(x + 4, y - 16, 4, 4);
+        ctx.strokeStyle = "#ff0055"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(x - 8, y - 10); ctx.lineTo(x - 3, y - 10); ctx.stroke();
+    } else {
+        // Ojos Default
+        ctx.fillStyle = data.ojos;
+        ctx.fillRect(x - 7, y - 16, 3, 5); ctx.fillRect(x + 4, y - 16, 3, 5);
     }
 
-    ctx.fillStyle = "#ffcc00";
-    objetivosOriginales.forEach((obj, idx) => {
-        obj.y += 2; ctx.fillRect(obj.x, obj.y, 35, 35);
-        if (obj.y > canvas.height) objetivosOriginales.splice(idx, 1);
-    });
+    // Cola de gato animada
+    let anguloCola = Math.sin(Date.now() * 0.005) * 0.3;
+    ctx.translate(x - 8, y + 12);
+    ctx.rotate(anguloCola);
+    ctx.strokeStyle = data.principal;
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(-10, -5, -12, -18); ctx.stroke();
+    ctx.restore();
+}
 
+// --- ACTUALIZAR MODO ORIGINAL (DAÑO Y COLISIONES CORREGIDOS) ---
+function actualizarModoOriginal() {
+    // Dibujar Barra de Vida del Jefe Sukuna
+    if (miniBossActivo) {
+        let bx = canvas.width / 2;
+        ctx.fillStyle = "#222"; ctx.fillRect(bx - 100, 40, 200, 14);
+        ctx.fillStyle = jefeHitTimer > 0 ? "#ffffff" : "#ff0055"; // Parpadea blanco al recibir daño
+        ctx.fillRect(bx - 100, 40, (miniBossHP / miniBossMaxHP) * 200, 14);
+        
+        if (jefeHitTimer > 0) jefeHitTimer--;
+
+        // Movimiento del Jefe
+        miniBossX += miniBossVX;
+        if (miniBossX < 60 || miniBossX > canvas.width - 60) miniBossVX *= -1;
+
+        // Renderizado del Cuadrado del Jefe
+        ctx.fillStyle = jefeHitTimer > 0 ? "#fff" : "#ff3c3c";
+        ctx.fillRect(miniBossX - 30, miniBossY, 60, 60);
+
+        // Ataques del jefe caen
+        if (Math.random() < 0.04) {
+            balasCaendo.push({ x: miniBossX + (Math.random() - 0.5) * 40, y: miniBossY + 60, vy: 5 });
+        }
+    }
+
+    // Balas del jugador (COLISIÓN REESTRUCTURADA EFECTIVA)
     ctx.fillStyle = "#a333ff";
     for (let i = misBalas.length - 1; i >= 0; i--) {
-        let mb = misBalas[i]; mb.y += mb.vy; ctx.fillRect(mb.x - 3, mb.y, 6, 15);
-        for (let o = objetivosOriginales.length - 1; o >= 0; o--) {
-            let obj = objetivosOriginales[o];
-            if (mb.x > obj.x && mb.x < obj.x + 35 && mb.y > obj.y && mb.y < obj.y + 35) {
-                objetivosOriginales.splice(o, 1); puntosPartida += 10; misBalas.splice(i, 1); break;
+        let mb = misBalas[i];
+        mb.y += mb.vy;
+        ctx.fillRect(mb.x - 3, mb.y, 6, 16);
+
+        // Verificar impacto real en la caja del Jefe
+        if (miniBossActivo && mb.x >= miniBossX - 30 && mb.x <= miniBossX + 30 && mb.y >= miniBossY && mb.y <= miniBossY + 60) {
+            miniBossHP -= 5; // Quita 5 puntos de vida
+            jefeHitTimer = 3; // Activa flash visual
+            playSound("hit");
+            puntosPartida += 10;
+            misBalas.splice(i, 1);
+            
+            if (miniBossHP <= 0) {
+                miniBossActivo = false;
+                puntosAcumulados += 150;
+                alert("¡Sukuna ha sido exiliado!");
+                volverAlMenuPrincipal();
             }
+            continue;
         }
-        if (miniBossActivo && mb.x > miniBossX - 45 && mb.x < miniBossX + 45 && mb.y > miniBossY && mb.y < miniBossY + 50) {
-            miniBossHP--; misBalas.splice(i, 1);
-            if (miniBossHP <= 0) { miniBossActivo = false; puntosPartida += 100; }
-        }
+
         if (mb.y < -20) misBalas.splice(i, 1);
     }
 
-    ctx.fillStyle = "#00d2ff";
+    // Balas enemigas dañan al jugador
+    ctx.fillStyle = "#00ffff";
     balasCaendo.forEach((bc, idx) => {
-        bc.y += bc.vy; ctx.fillRect(bc.x, bc.y, 4, 12);
-        if (bc.y > jugadorY - 15 && bc.y < jugadorY + 15 && bc.x > jugadorX - 20 && bc.x < jugadorX + 20) { 
-            balasCaendo.splice(idx, 1); jugadorHP--; 
+        bc.y += bc.vy;
+        ctx.fillRect(bc.x - 2, bc.y, 4, 12);
+        
+        if (bc.y >= jugadorY - 20 && bc.y <= jugadorY + 20 && bc.x >= jugadorX - 20 && bc.x <= jugadorX + 20) {
+            balasCaendo.splice(idx, 1);
+            jugadorHP -= 2;
+            let txtHP = document.getElementById("txt-vida");
+            if(txtHP) txtHP.innerText = jugadorHP;
+            if (jugadorHP <= 0) {
+                alert("Game Over - Tu gato se quedó sin energía.");
+                volverAlMenuPrincipal();
+            }
         }
         if (bc.y > canvas.height) balasCaendo.splice(idx, 1);
     });
-
-    if (miniBossActivo) {
-        miniBossX += miniBossVX; if(miniBossX < 50 || miniBossX > canvas.width - 50) miniBossVX *= -1;
-        ctx.fillStyle = "#e60067"; ctx.fillRect(miniBossX - 45, miniBossY, 90, 50);
-    }
-}
-
-function actualizarModoRitmo() {
-    anguloPlaneta += 0.06;
-    let radioOrbita = 50; 
-    let centroX = pivoteFuego ? fuegoX : hieloX; let centroY = pivoteFuego ? fuegoY : hieloY;
-
-    if (pivoteFuego) {
-        hieloX = centroX + Math.cos(anguloPlaneta) * radioOrbita;
-        hieloY = centroY + Math.sin(anguloPlaneta) * radioOrbita;
-    } else {
-        fuegoX = centroX + Math.cos(anguloPlaneta) * radioOrbita;
-        fuegoY = centroY + Math.sin(anguloPlaneta) * radioOrbita;
-    }
-
-    let esferaFocoX = pivoteFuego ? hieloX : fuegoX;
-    let esferaFocoY = pivoteFuego ? hieloY : fuegoY;
-    camaraScrollX += (esferaFocoX - camaraScrollX - canvas.width / 2) * 0.1;
-    camaraScrollY += (esferaFocoY - camaraScrollY - canvas.height / 2) * 0.1;
-
-    ctx.save(); ctx.translate(-camaraScrollX, -camaraScrollY);
-    bloquesRitmo.forEach((bl, idx) => {
-        ctx.fillStyle = (idx <= indiceBloqueActual) ? "#552277" : "#252535";
-        ctx.fillRect(bl.x - 25, bl.y - 25, 50, 50);
-    });
-    ctx.fillStyle = "#ff2200"; ctx.beginPath(); ctx.arc(fuegoX, fuegoY, 12, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "#00aaff"; ctx.beginPath(); ctx.arc(hieloX, hieloY, 12, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-}
-
-function actualizarModoShoot() {
-    if (Date.now() - tiempoUltimaCajaShoot > 1200) { tiempoUltimaCajaShoot = Date.now(); lanzarCajaShootPro(); }
-    listaCajasShoot.forEach(c => { c.y += 3; ctx.fillStyle = "#ffaa00"; ctx.fillRect(c.x, c.y, 40, 40); });
-}
-
-function lanzarCajaShootPro() {
-    listaCajasShoot.push({ x: 50 + Math.random() * (canvas.width - 100), y: -40 });
-}
-
-function dibujarGatoReal(x, y) {
-    let s = SKINS_GATOS[skinEquipada] || SKINS_GATOS["Default Cat"];
-    ctx.fillStyle = s.principal; ctx.beginPath(); ctx.arc(x, y - 12, 15, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = s.pecho; ctx.beginPath(); ctx.ellipse(x, y + 6, 9, 12, 0, 0, Math.PI*2); ctx.fill();
 }
 
 function renderSkins() {
@@ -544,10 +439,21 @@ function renderSkins() {
 
 function equiparSkin(name) { skinEquipada = name; guardarProgresoLocal(); renderSkins(); }
 
-// --- ARRANQUE ---
+function activarPausa(estado) {
+    juegoPausado = estado;
+    let mPausa = document.getElementById("menu-pausa");
+    if(mPausa) mPausa.style.display = estado ? "flex" : "none";
+}
+
+function volverAlMenuPrincipal() {
+    puntosAcumulados += puntosPartida;
+    guardarProgresoLocal(); activarPausa(false); cambiarPantalla('menu');
+}
+
 window.onload = () => { 
     redimensionar(); 
     generarEstrellas(); 
     cargarProgresoGuardado(); 
     buclePrincipal(); 
 };
+
