@@ -674,4 +674,3 @@ function equiparSkin(name) {
 }
 
 window.onload = () => { redimensionar(); generarEstrellas(); buclePrincipal(); };
-
