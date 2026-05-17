@@ -10,8 +10,7 @@ const FORMULAS_MATH_CODE = [
     "X_new = x * cos(θ) - y * sin(θ) + translation.x;",
     "hitbox.dist = abs(A*x + B*y + C) / sqrt(A*A + B*B);",
     "velocity.y += gravity * delta_time;",
-    "void main() { gl_FragColor = vec4(0.0, 1.0, 0.8, 1.0); }",
-    "localStorage.setItem('SHADOW_CAT_SAVE_3', total_pts);"
+    "void main() { gl_FragColor = vec4(0.0, 1.0, 0.8, 1.0); }"
 ];
 
 const SKINS_GATOS = {
@@ -20,19 +19,24 @@ const SKINS_GATOS = {
     "Yuji Itadori": { principal: "#260606", pecho: "#400d0d", ojos: "#ff3c3c", aura: "rgba(255,60,60,0.3)" }
 };
 
-// Atributos y Estado del Gato
+// Atributos del Jugador
 let jugadorX = 200, jugadorY = 400, jugadorHP = 10;
 let misBalas = [], objetivosOriginales = [], balasCaendo = [], particulasFX = [];
 let estrellasFondo = [], energiaMaldita = 0, puntosPartida = 0;
 
-// Estado del Boss y Turnos
+// Estado del Boss y Animaciones Especiales
 let purpuraActivoContador = 0;
 let miniBossActivo = false;
 let miniBossHP = 20;
-let miniBossX = 200, miniBossY = 90, miniBossVX = 1.5; // FASE 1 MÁS FÁCIL (VELOCIDAD REDUCIDA)
+let miniBossX = 200, miniBossY = 90, miniBossVX = 1.5;
 let tiempoInicioPartida = 0;
-let cutsceneGatoSecretaContador = 0; // Transición cinemática Gojo
 
+// SISTEMA DE ANIMACIÓN EXTENDIDA (BLACK FLASH & SUKUNA)
+let temporizadorBlackFlash = 0; 
+let jefeMuriendoX = 0;
+let jefeMuriendoY = 0;
+
+// Estado Sans
 let faseJefeSecreto = 1;
 let jefeSecretoHP = 100;
 let cuadroSans = { x: 0, y: 0, w: 260, h: 260 };
@@ -41,13 +45,13 @@ let turnoJugadorSans = false;
 let listaAtaquesFase = [];
 let textoRefusedContador = 0;
 
-// Mecánicas Dance of Fire and Ice
+// Mecánicas Dance of Fire (Corregido con Ventana de Tiempo)
 let bloquesRitmo = [];
 let indiceBloqueActual = 0;
 let fuegoX = 0, fuegoY = 0, hieloX = 0, hieloY = 0, anguloPlaneta = 0;
 let pivoteFuego = true;
 let camaraScrollX = 0, camaraScrollY = 0;
-let toleranciaRitmoAcertado = false;
+let cuboFalloColorAzul = false;
 
 // Mecánicas Shoot the Box
 let listaCajasShoot = [];
@@ -58,7 +62,7 @@ let duracionSlowMo = 0;
 let factorMultiplicador = 1;
 let tiempoUltimaCajaShoot = 0;
 
-// Variables de Pantalla de Carga y Animación de Rayo Matemático
+// Carga y Rayo
 let progresoCargaPorcentaje = 0;
 let lineasMatematicasVisibles = [];
 let radioLaserDeCarga = 0;
@@ -94,18 +98,55 @@ function guardarProgresoLocal() {
     localStorage.setItem("SHADOW_CAT_SAVE_3", JSON.stringify({ puntos: puntosAcumulados, skin: skinEquipada }));
 }
 
+// --- REPRODUCTOR DE AUDIO INTEGRADO (SINTETIZADOR DE EFECTOS Y MÚSICA) ---
 function inicializarAudioNativo() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        reproducirMusicaFondo(); // Inicia la música sintética estilo JJK en bucle
+    }
 }
 
-function sonarClickRitmo() {
+function reproducirMusicaFondo() {
     if (!audioCtx) return;
-    let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain();
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.type = "sine"; osc.frequency.setValueAtTime(580, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.07);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.08);
+    setInterval(() => {
+        if (modoActual !== "menu" && modoActual !== "carga" && !juegoPausado) {
+            let notas = [110, 130, 146, 165, 196]; // Escala pentatónica menor oscura
+            let nota = notas[Math.floor(Math.random() * notas.length)];
+            let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.type = "sawtooth"; osc.frequency.setValueAtTime(nota, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+        }
+    }, 450); // Ritmo constante (Beat)
+}
+
+function playSound(tipo) {
+    if (!audioCtx) return;
+    let osc = audioCtx.createOscillator();
+    let gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    if (tipo === "click" || tipo === "hit") {
+        osc.type = "sine"; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.08);
+    } else if (tipo === "black_flash") { // Sonido destructivo y seco con bajos
+        osc.type = "triangle"; osc.frequency.setValueAtTime(80, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.6);
+    } else if (tipo === "corte") { // Agudo y rápido
+        osc.type = "sawtooth"; osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+    }
 }
 
 function cambiarPantalla(destino) {
@@ -114,11 +155,11 @@ function cambiarPantalla(destino) {
     document.getElementById("hud-juego").style.display = "none";
     document.getElementById("btn-purpura").style.display = "none";
 
-    juegoPausado = false; miniBossActivo = false; textoRefusedContador = 0; cutsceneGatoSecretaContador = 0;
+    juegoPausado = false; miniBossActivo = false; textoRefusedContador = 0; temporizadorBlackFlash = 0;
     energiaMaldita = 0; puntosPartida = 0; jugadorHP = 10; purpuraActivoContador = 0;
     faseJefeSecreto = 1; jefeSecretoHP = 100; turnoJugadorSans = false;
     duracionSlowMo = 0; factorMultiplicador = 1;
-    camaraScrollX = 0; camaraScrollY = 0;
+    camaraScrollX = 0; camaraScrollY = 0; cuboFalloColorAzul = false;
 
     if (destino === 'menu') {
         modoActual = "menu";
@@ -156,10 +197,10 @@ function volverAlMenuPrincipal() {
     cambiarPantalla('menu');
 }
 
-// --- CAPTURA DE TOUCH / CLICK EN PANTALLA ---
+// --- ENTRADAS DE CONTROL ---
 window.addEventListener('pointerdown', (e) => {
     inicializarAudioNativo();
-    if (juegoPausado || modoActual === "menu" || modoActual === "carga" || textoRefusedContador > 0 || cutsceneGatoSecretaContador > 0) return;
+    if (juegoPausado || modoActual === "menu" || modoActual === "carga" || textoRefusedContador > 0 || temporizadorBlackFlash > 0) return;
 
     if (modoActual === "original") {
         let toqueX = e.clientX; let toqueY = e.clientY;
@@ -173,22 +214,27 @@ window.addEventListener('pointerdown', (e) => {
         }
     }
 
-    if (modoActual === "jefe_secreto" && turnoJugadorSans) {
-        let bx = canvas.width / 2; let by = cuadroSans.y - 45;
-        if (Math.abs(e.clientX - bx) < 50 && Math.abs(e.clientY - by) < 50) {
-            misBalas.push({ x: jugadorX, y: jugadorY, tx: bx, ty: by, tipo: "sans" });
-        }
-    }
-
     if (modoActual === "ritmo") {
-        if (toleranciaRitmoAcertado) {
-            indiceBloqueActual++; puntosPartida += 10; sonarClickRitmo();
-            let proximo = bloquesRitmo[indiceBloqueActual];
-            if (pivoteFuego) { fuegoX = proximo.x; fuegoY = proximo.y; pivoteFuego = false; }
-            else { hieloX = proximo.x; hieloY = proximo.y; pivoteFuego = true; }
-            if (indiceBloqueActual >= bloquesRitmo.length - 1) { alert("¡Mapa rítmico completado!"); volverAlMenuPrincipal(); }
-        } else {
-            alert("¡Fuera de ritmo! Fin del juego."); volverAlMenuPrincipal();
+        // CORRECCIÓN: Validar si la bola giratoria está colisionando en el rango correcto del bloque objetivo
+        let centroX = pivoteFuego ? fuegoX : hieloX;
+        let centroY = pivoteFuego ? fuegoY : hieloY;
+        let proximoBloque = bloquesRitmo[indiceBloqueActual + 1];
+
+        if (proximoBloque) {
+            let distanciaAlBloque = Math.sqrt(Math.pow(centroX - proximoBloque.x, 2) + Math.pow(centroY - proximoBloque.y, 2));
+            
+            // Margen de tolerancia de píxeles (Hitbox de ritmo)
+            if (distanciaAlBloque <= 30) { 
+                indiceBloqueActual++; 
+                puntosPartida += 10; 
+                playSound("click");
+                if (pivoteFuego) { fuegoX = proximoBloque.x; fuegoY = proximoBloque.y; pivoteFuego = false; }
+                else { hieloX = proximoBloque.x; hieloY = proximoBridge.y;分配; hieloY = proximoBloque.y; pivoteFuego = true; }
+                anguloPlaneta = Math.PI; // Reinicia el ángulo relativo convenientemente para el siguiente pivote
+                if (indiceBloqueActual >= bloquesRitmo.length - 1) { alert("¡Mapa completado!"); volverAlMenuPrincipal(); }
+            } else {
+                ejecutarFalloRitmo();
+            }
         }
     }
 
@@ -203,13 +249,8 @@ window.addEventListener('pointerdown', (e) => {
 });
 
 window.addEventListener('pointermove', (e) => {
-    if (juegoPausado || modoActual === "menu" || modoActual === "carga" || textoRefusedContador > 0 || cutsceneGatoSecretaContador > 0) return;
-
+    if (juegoPausado || modoActual === "menu" || modoActual === "carga" || textoRefusedContador > 0 || temporizadorBlackFlash > 0) return;
     if (modoActual === "original") jugadorX = Math.max(30, Math.min(canvas.width - 30, e.clientX));
-    if (modoActual === "jefe_secreto" && !turnoJugadorSans) {
-        jugadorX = Math.max(cuadroSans.x + 15, Math.min(cuadroSans.x + cuadroSans.w - 15, e.clientX));
-        jugadorY = Math.max(cuadroSans.y + 15, Math.min(cuadroSans.y + cuadroSans.h - 15, e.clientY));
-    }
     if (modoActual === "shoot" && cargandoTiroShoot) { arrastreX = e.clientX; arrastreY = e.clientY; }
 });
 
@@ -221,25 +262,24 @@ window.addEventListener('pointerup', (e) => {
     }
 });
 
-function detonarIlimitadoPurpura() {
-    if (energiaMaldita >= 100 && purpuraActivoContador === 0) {
-        energiaMaldita = 0; purpuraActivoContador = 180;
-        document.getElementById("btn-purpura").style.display = "none";
-    }
+function ejecutarFalloRitmo() {
+    cuboFalloColorAzul = true;
+    setTimeout(() => {
+        alert("¡Fuera de tiempo o muy lejos! Fin del juego.");
+        volverAlMenuPrincipal();
+    }, 400);
 }
 
-// --- MANEJADOR DE PARTÍCULAS EXCLUSIVAS POR SKIN ---
+// --- EFECTOS VISUALES EXCLUSIVOS ---
 function ejecutarImpactoEspecialFX(x, y) {
+    playSound("hit");
     if (skinEquipada === "Default Cat") {
-        // Chispas explosivas tradicionales amarillas
         for(let i=0; i<10; i++) {
             particulasFX.push({ tipo: "chispa", x: x, y: y, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, alpha: 1, color: "#ffcc00" });
         }
     } else if (skinEquipada === "Gojo Satoru") {
-        // Agujero negro expansivo/colapsivo (Vacío infinito miniatura)
         particulasFX.push({ tipo: "agujero_negro", x: x, y: y, radioMax: 30, radioActual: 2, expanding: true, timer: 40 });
     } else if (skinEquipada === "Yuji Itadori") {
-        // Efecto de corte en cruz (Corte limpio a la mitad)
         particulasFX.push({ tipo: "corte", x: x, y: y, longitudMax: 25, longitudActual: 0, timer: 20 });
     }
 }
@@ -249,10 +289,10 @@ function generarCaminoBloquesRitmo() {
     let cx = 150, cy = 300;
     for(let i=0; i<30; i++) {
         bloquesRitmo.push({ x: cx, y: cy });
-        cx += 80; if(i % 3 === 0) cy += (Math.random() > 0.5 ? 70 : -70);
+        cx += 100; if(i % 3 === 0) cy += (Math.random() > 0.5 ? 80 : -80);
     }
     fuegoX = bloquesRitmo[0].x; fuegoY = bloquesRitmo[0].y;
-    hieloX = fuegoX + 80; hieloY = fuegoY;
+    hieloX = fuegoX + 100; hieloY = fuegoY;
     pivoteFuego = true; anguloPlaneta = 0;
 }
 
@@ -266,7 +306,7 @@ function lanzarCajaShootPro() {
     });
 }
 
-// --- LOOP PRINCIPAL MOTOR DE GRÁFICOS ---
+// --- LOOP PRINCIPAL ---
 function buclePrincipal() {
     ctx.fillStyle = "#020205"; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -279,7 +319,6 @@ function buclePrincipal() {
     ctx.fillStyle = "rgba(255,255,255,0.15)";
     estrellasFondo.forEach(st => { ctx.fillRect(st.x, st.y, 2, 2); });
 
-    // PROCESAR EFECTOS VISUALES DINÁMICOS EN TIEMPO REAL
     actualizarYRenderizarParticulasEspeciales();
 
     if (modoActual !== "menu" && !juegoPausado) {
@@ -289,19 +328,19 @@ function buclePrincipal() {
         else if (modoActual === "shoot") actualizarModoShoot();
 
         if (jugadorHP <= 0) {
-            alert(`Murió el Gato. Puntos conservados: +${puntosPartida}`);
+            alert(`Murió el Gato. Puntos: +${puntosPartida}`);
             volverAlMenuPrincipal();
         }
     }
 
-    if (modoActual !== "menu" && modoActual !== "ritmo") {
+    // No dibujar al personaje si estamos en cinemática pura o modo rítmico alejado
+    if (modoActual !== "menu" && modoActual !== "ritmo" && temporizadorBlackFlash === 0) {
         dibujarGatoReal(jugadorX, jugadorY);
     }
 
     requestAnimationFrame(buclePrincipal);
 }
 
-// --- ANIMACIÓN DE LA PANTALLA DE CARGA CON RAYO MATEMÁTICO EN LA GRÁFICA ---
 function ejecutarProcesamientoCargaMatricial() {
     if (!laserDisparadoMatematico) {
         progresoCargaPorcentaje += 0.8;
@@ -323,35 +362,14 @@ function ejecutarProcesamientoCargaMatricial() {
     });
 
     let cx = canvas.width / 2; let cy = canvas.height / 2 - 80;
-    
-    // Dibujo preliminar del Gato con líneas de vector matemático
-    if (!laserDisparadoMatematico) {
-        ctx.strokeStyle = "rgba(144, 0, 199, 0.5)"; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.arc(cx, cy, 35 + Math.sin(progresoCargaPorcentaje*0.1)*5, 0, Math.PI*2); ctx.stroke();
-        ctx.beginPath(); ctx.arc(cx, cy - 25, 20, 0, Math.PI*2); ctx.stroke();
-        ctx.strokeRect(cx - 20, cy - 45, 40, 40);
-        ctx.fillStyle = "#00ffcc";
-        ctx.fillText("MATRIX_VEC_HEAD: LOADED", cx + 45, cy - 25);
-    }
-
-    // DISPARAR EL RAYO CUANDO LA BARRA LLEGA AL 100%
-    if (progresoCargaPorcentaje >= 100 && !laserDisparadoMatematico) {
-        laserDisparadoMatematico = true;
-        radioLaserDeCarga = 1;
-        document.getElementById("tit-compile").innerText = "LINKING INTERFACE...";
-    }
 
     if (laserDisparadoMatematico) {
-        radioLaserDeCarga += 15; // Expansión del rayo matemático
-        
-        // El rayo cruzando de arriba hacia abajo dibujando todo el canvas
+        radioLaserDeCarga += 15;
         ctx.fillStyle = "white";
         ctx.fillRect(0, cy - 5, canvas.width, 10);
         
         ctx.fillStyle = "rgba(163, 51, 255, 0.3)";
-        ctx.beginPath();
-        ctx.arc(cx, cy, radioLaserDeCarga, 0, Math.PI*2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, radioLaserDeCarga, 0, Math.PI*2); ctx.fill();
 
         if (radioLaserDeCarga > canvas.width * 0.9) {
             document.getElementById("pantalla-carga").style.display = "none";
@@ -359,13 +377,16 @@ function ejecutarProcesamientoCargaMatricial() {
             cambiarPantalla('menu');
         }
     }
+
+    if (progresoCargaPorcentaje >= 100 && !laserDisparadoMatematico) {
+        laserDisparadoMatematico = true;
+        radioLaserDeCarga = 1;
+    }
 }
 
-// --- RENDERIZADO DE LOS EFECTOS VISUALES EXCLUSIVOS DE SKIN ---
 function actualizarYRenderizarParticulasEspeciales() {
     for (let i = particulasFX.length - 1; i >= 0; i--) {
         let f = particulasFX[i];
-        
         if (f.tipo === "chispa") {
             f.x += f.vx; f.y += f.vy; f.alpha -= 0.04;
             ctx.globalAlpha = Math.max(0, f.alpha);
@@ -374,60 +395,85 @@ function actualizarYRenderizarParticulasEspeciales() {
         }
         else if (f.tipo === "agujero_negro") {
             f.timer--;
-            if (f.expanding) {
-                f.radioActual += 2.5;
-                if(f.radioActual >= f.radioMax) f.expanding = false;
-            } else {
-                f.radioActual -= 1.5;
-            }
-            
-            // Dibujar círculo concéntrico morado y azul (Efecto Vacío Infinito)
+            if (f.expanding) { f.radioActual += 2.5; if(f.radioActual >= f.radioMax) f.expanding = false; }
+            else { f.radioActual -= 1.5; }
             let grad = ctx.createRadialGradient(f.x, f.y, f.radioActual*0.1, f.x, f.y, f.radioActual);
             grad.addColorStop(0, '#000000'); grad.addColorStop(0.5, '#4b0082'); grad.addColorStop(1, 'rgba(0, 210, 255, 0.0)');
             ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(f.x, f.y, f.radioActual, 0, Math.PI*2); ctx.fill();
-
             if (f.timer <= 0 || f.radioActual <= 1) particulasFX.splice(i, 1);
         }
         else if (f.tipo === "corte") {
-            f.timer--;
-            f.longitudActual += 2.5;
-            
-            // Líneas de corte diagonales cruzadas rojas (Divergent Fist/Cleave)
+            f.timer--; f.longitudActual += 2.5;
             ctx.strokeStyle = "#ff1133"; ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(f.x - f.longitudActual, f.y - f.longitudActual);
-            ctx.lineTo(f.x + f.longitudActual, f.y + f.longitudActual);
-            ctx.moveTo(f.x + f.longitudActual, f.y - f.longitudActual);
-            ctx.lineTo(f.x - f.longitudActual, f.y + f.longitudActual);
+            ctx.moveTo(f.x - f.longitudActual, f.y - f.longitudActual); ctx.lineTo(f.x + f.longitudActual, f.y + f.longitudActual);
+            ctx.moveTo(f.x + f.longitudActual, f.y - f.longitudActual); ctx.lineTo(f.x - f.longitudActual, f.y + f.longitudActual);
             ctx.stroke();
-
             if (f.timer <= 0) particulasFX.splice(i, 1);
         }
     }
     ctx.globalAlpha = 1.0;
 }
 
-// --- MODO ARENA ORIGINAL CORREGIDO ---
+// --- MODO ARENA CON ANIMACIÓN EXTENDIDA DE DERROTA ---
 function actualizarModoOriginal() {
-    // CINEMÁTICA SECRETA GOJO: PANTALLA DE TEXTO CONGELADA
-    if (cutsceneGatoSecretaContador > 0) {
-        cutsceneGatoSecretaContador--;
-        ctx.fillStyle = "rgba(10, 5, 28, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = "white"; ctx.font = "bold 28px sans-serif";
-        ctx.fillText("Mini Boss Defeated.", canvas.width/2 - 120, canvas.height/2 - 40);
-        ctx.fillStyle = "#00d2ff"; ctx.font = "italic bold 32px Courier New";
-        ctx.fillText('"Nah, I\'d win."', canvas.width/2 - 110, canvas.height/2 + 20);
-        
-        if (cutsceneGatoSecretaContador === 0) iniciarTransicionSans();
+    // CINEMÁTICA: BLACK FLASH & SUKUNA SLASHES (EXTENDIDO)
+    if (temporizadorBlackFlash > 0) {
+        temporizadorBlackFlash--;
+
+        // 1. IMPACT FRAMES: Alternación violenta de colores base
+        if (temporizadorBlackFlash > 130) {
+            if (temporizadorBlackFlash % 4 === 0) {
+                ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+            } else if (temporizadorBlackFlash % 4 === 2) {
+                ctx.fillStyle = "#ff0022"; ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.fillStyle = "#000000"; ctx.font = "bold 40px sans-serif";
+                ctx.fillText("BLACK FLASH!!", canvas.width/2 - 130, canvas.height/2);
+            } else {
+                ctx.fillStyle = "#000000"; ctx.fillRect(0,0,canvas.width,canvas.height);
+            }
+            
+            // Temblor de pantalla agresivo simulado en la posición del render
+            jefeMuriendoX += (Math.random() - 0.5) * 20;
+            jefeMuriendoY += (Math.random() - 0.5) * 20;
+
+            if (temporizadorBlackFlash === 131) playSound("black_flash");
+        } 
+        // 2. CORTES CONTINUOS DE SUKUNA (DESMANTELAR)
+        else if (temporizadorBlackFlash > 40) {
+            ctx.fillStyle = "rgba(5, 2, 10, 0.8)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Render del jefe fragmentándose
+            ctx.fillStyle = "#e60067"; 
+            ctx.fillRect(jefeMuriendoX - 45, jefeMuriendoY, 90, 50);
+
+            // Líneas de corte parpadeantes sobre él
+            if (temporizadorBlackFlash % 6 === 0) {
+                playSound("corte");
+                ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(jefeMuriendoX - 100, jefeMuriendoY + (Math.random()*50));
+                ctx.lineTo(jefeMuriendoX + 100, jefeMuriendoY + (Math.random()*50));
+                ctx.stroke();
+            }
+        } 
+        // 3. COLAPSO Y DESINTEGRACIÓN TOTAL
+        else {
+            ctx.fillStyle = "black"; ctx.fillRect(0,0,canvas.width,canvas.height);
+            for (let k = 0; k < 3; k++) {
+                particulasFX.push({ tipo: "chispa", x: jefeMuriendoX + (Math.random()-0.5)*80, y: jefeMuriendoY + (Math.random()-0.5)*50, vx: (Math.random()-0.5)*6, vy: (Math.random()-0.5)*6, alpha: 1, color: "#ff1133" });
+            }
+        }
+
+        if (temporizadorBlackFlash === 1) iniciarTransicionSans();
         return;
     }
 
-    // FASE 1 COMPLETAMENTE RE-CALIBRADA: VELOCIDAD Y BALAS MUY FÁCILES
+    // FASE 1 REGULAR: Flujo de juego estándar y suave
     if (Math.random() < 0.012) objetivosOriginales.push({ x: Math.random() * (canvas.width - 40), y: -40 });
-    if (Math.random() < 0.02) balasCaendo.push({ x: Math.random() * canvas.width, y: -20, vy: 2.2 }); // Balas enemigas más lentas
+    if (Math.random() < 0.02) balasCaendo.push({ x: Math.random() * canvas.width, y: -20, vy: 2.2 });
 
-    if (Date.now() - tiempoInicioPartida > 10000 && !miniBossActivo && faseJefeSecreto === 1) {
+    if (Date.now() - tiempoInicioPartida > 8000 && !miniBossActivo && faseJefeSecreto === 1) {
         miniBossActivo = true; miniBossHP = 20; miniBossX = canvas.width / 2;
     }
 
@@ -446,22 +492,8 @@ function actualizarModoOriginal() {
         if (bc.y > canvas.height) balasCaendo.splice(idx, 1);
     });
 
-    if (purpuraActivoContador > 0) {
-        purpuraActivoContador--;
-        ctx.fillStyle = "rgba(163, 51, 255, 0.85)";
-        ctx.fillRect(jugadorX - 45, 0, 90, canvas.height);
-        objetivosOriginales = []; balasCaendo = [];
-        if (miniBossActivo) {
-            miniBossHP -= 0.5;
-            if (miniBossHP <= 0) verificarDerrotaBossOriginal();
-        }
-    }
-
     for (let i = misBalas.length - 1; i >= 0; i--) {
-        let mb = misBalas[i];
-        let dx = mb.tx - mb.x; let dy = mb.ty - mb.y;
-        let dist = Math.sqrt(dx*dx + dy*dy);
-
+        let mb = misBalas[i]; let dx = mb.tx - mb.x; let dy = mb.ty - mb.y; let dist = Math.sqrt(dx*dx + dy*dy);
         if (dist > 6) {
             mb.x += (dx / dist) * 12; mb.y += (dy / dist) * 12;
             ctx.fillStyle = "#a333ff"; ctx.beginPath(); ctx.arc(mb.x, mb.y, 6, 0, Math.PI*2); ctx.fill();
@@ -469,34 +501,25 @@ function actualizarModoOriginal() {
             if (mb.tipo === "normal") {
                 objetivosOriginales.forEach((obj, oIdx) => {
                     if (Math.abs(mb.x - (obj.x + 15)) < 30 && Math.abs(mb.y - (obj.y + 15)) < 30) {
-                        ejecutarImpactoEspecialFX(obj.x + 15, obj.y + 15); // Dispara efecto exclusivo
+                        ejecutarImpactoEspecialFX(obj.x + 15, obj.y + 15);
                         objetivosOriginales.splice(oIdx, 1); puntosPartida += 10;
-                        if(energiaMaldita < 100) energiaMaldita += 8;
                     }
                 });
             } else if (mb.tipo === "boss" && miniBossActivo) {
                 miniBossHP--;
-                if (miniBossHP <= 0) verificarDerrotaBossOriginal();
+                if (miniBossHP <= 0) {
+                    miniBossActivo = false;
+                    temporizadorBlackFlash = 170; // 170 cuadros de animación destructiva extendida
+                    jefeMuriendoX = miniBossX; jefeMuriendoY = miniBossY;
+                }
             }
             misBalas.splice(i, 1);
         }
     }
 
     if (miniBossActivo) {
-        miniBossX += miniBossVX;
-        if(miniBossX < 40 || miniBossX > canvas.width - 40) miniBossVX *= -1;
+        miniBossX += miniBossVX; if(miniBossX < 40 || miniBossX > canvas.width - 40) miniBossVX *= -1;
         ctx.fillStyle = "#e60067"; ctx.fillRect(miniBossX - 45, miniBossY, 90, 50);
-        ctx.fillStyle = "white"; ctx.font = "bold 11px sans-serif";
-        ctx.fillText(`MINI BOSS: ${Math.floor(miniBossHP)} HP`, miniBossX - 35, miniBossY - 10);
-    }
-}
-
-function verificarDerrotaBossOriginal() {
-    miniBossActivo = false;
-    if (skinEquipada === "Gojo Satoru") {
-        cutsceneGatoSecretaContador = 180; // Activa escena de Gojo por 3 segundos
-    } else {
-        iniciarTransicionSans();
     }
 }
 
@@ -508,7 +531,7 @@ function iniciarTransicionSans() {
     generarAtaquesDiagonalesSans();
 }
 
-// --- SANS BOSSFIGHT ---
+// --- SANS COMBAT WORKFLOW ---
 function actualizarModoSans() {
     if (textoRefusedContador > 0) {
         textoRefusedContador--;
@@ -525,7 +548,6 @@ function actualizarModoSans() {
     let sx = canvas.width / 2; let sy = cuadroSans.y - 45;
     ctx.fillStyle = "#111"; ctx.fillRect(sx - 25, sy - 25, 50, 45);
     ctx.strokeStyle = (turnoJugadorSans) ? "#00ff00" : "#ff0044"; ctx.strokeRect(sx - 25, sy - 25, 50, 45);
-    ctx.fillStyle = "white"; ctx.font = "10px sans-serif"; ctx.fillText(`SANS HP: ${jefeSecretoHP}`, sx - 30, sy - 32);
 
     if (!turnoJugadorSans) {
         ctx.strokeStyle = "white"; ctx.lineWidth = 4; ctx.strokeRect(cuadroSans.x, cuadroSans.y, cuadroSans.w, cuadroSans.h);
@@ -537,7 +559,7 @@ function actualizarModoSans() {
         if (!turnoJugadorSans) {
             faseJefeSecreto++;
             if (faseJefeSecreto === 10 && jefeSecretoHP > 0) textoRefusedContador = 150;
-            else if (faseJefeSecreto > 10 || jefeSecretoHP <= 0) { alert("¡VENCISTE AL JEFE!"); volverAlMenuPrincipal(); }
+            else if (faseJefeSecreto > 10 || jefeSecretoHP <= 0) { alert("¡Derrotado con éxito!"); volverAlMenuPrincipal(); }
             else generarAtaquesDiagonalesSans();
         }
     }
@@ -551,26 +573,11 @@ function actualizarModoSans() {
                 ctx.fillStyle = "#ffffff"; ctx.fillRect(atk.x, atk.y, 12, 12);
                 if (Math.abs(jugadorX - atk.x) < 18 && Math.abs(jugadorY - atk.y) < 18) jugadorHP--;
             }
-            if (atk.tipo === "gaster_triangulo") {
-                atk.timer++;
-                ctx.strokeStyle = "#00ffcc"; ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.moveTo(atk.x, atk.y - 15); ctx.lineTo(atk.x - 15, atk.y + 15); ctx.lineTo(atk.x + 15, atk.y + 15); ctx.closePath(); ctx.stroke();
-
-                if (atk.timer > 45) {
-                    ctx.strokeStyle = "rgba(0, 255, 200, 0.8)"; ctx.lineWidth = 14;
-                    ctx.beginPath(); ctx.moveTo(atk.x, atk.y); ctx.lineTo(atk.x + atk.lx * 400, atk.y + atk.ly * 400); ctx.stroke();
-
-                    let distGatoLaser = Math.abs((atk.ly*400)*jugadorX - (atk.lx*400)*jugadorY + (atk.x + atk.lx*400)*atk.y - (atk.y + atk.ly*400)*atk.x) / Math.sqrt(Math.pow(atk.ly*400,2) + Math.pow(atk.lx*400,2));
-                    if (distGatoLaser < 16 && jugadorY > atk.y) jugadorHP--;
-                }
-            }
         });
     }
 
     for (let i = misBalas.length - 1; i >= 0; i--) {
-        let mb = misBalas[i];
-        let dx = mb.tx - mb.x; let dy = mb.ty - mb.y;
-        let d = Math.sqrt(dx*dx + dy*dy);
+        let mb = misBalas[i]; let dx = mb.tx - mb.x; let dy = mb.ty - mb.y; let d = Math.sqrt(dx*dx + dy*dy);
         if (d > 5) {
             mb.x += (dx / d) * 14; mb.y += (dy / d) * 14;
             ctx.fillStyle = "#00ff00"; ctx.beginPath(); ctx.arc(mb.x, mb.y, 6, 0, Math.PI*2); ctx.fill();
@@ -582,44 +589,59 @@ function actualizarModoSans() {
 
 function generarAtaquesDiagonalesSans() {
     listaAtaquesFase = [];
-    let nAtaques = 15 + faseJefeSecreto * 2;
-    for (let i = 0; i < nAtaques; i++) {
-        if (Math.random() > 0.5) {
-            listaAtaquesFase.push({ tipo: "hueso_diagonal", x: cuadroSans.x + cuadroSans.w / 2, y: cuadroSans.y + cuadroSans.h / 2, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5 });
-        } else {
-            listaAtaquesFase.push({ tipo: "gaster_triangulo", x: cuadroSans.x + Math.random() * cuadroSans.w, y: cuadroSans.y + 15, lx: Math.random() - 0.5, ly: Math.random() * 0.5 + 0.5, timer: 0 });
-        }
+    for (let i = 0; i < 15; i++) {
+        listaAtaquesFase.push({ tipo: "hueso_diagonal", x: cuadroSans.x + cuadroSans.w / 2, y: cuadroSans.y + cuadroSans.h / 2, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5 });
     }
 }
 
-// --- DANCE OF FIRE AND ICE ---
+// --- DANCE OF FIRE AND ICE (SISTEMA TOTALMENTE RE-ESTRUCTURADO) ---
 function actualizarModoRitmo() {
-    anguloPlaneta += 0.055; let radioOrbita = 70;
-    let anguloReducido = anguloPlaneta % Math.PI;
-    toleranciaRitmoAcertado = (anguloReducido < 0.2 || anguloReducido > Math.PI - 0.2);
+    anguloPlaneta += 0.045; // Velocidad de la órbita de las esferas
+    let radioOrbita = 65;
 
-    let centroX = pivoteFuego ? fuegoX : hieloX; let centroY = pivoteFuego ? fuegoY : hieloY;
+    let centroX = pivoteFuego ? fuegoX : hieloX;
+    let centroY = pivoteFuego ? fuegoY : hieloY;
+
     if (pivoteFuego) {
-        hieloX = centroX + Math.cos(anguloPlaneta) * radioOrbita; hieloY = centroY + Math.sin(anguloPlaneta) * radioOrbita;
+        hieloX = centroX + Math.cos(anguloPlaneta) * radioOrbita;
+        hieloY = centroY + Math.sin(anguloPlaneta) * radioOrbita;
     } else {
-        fuegoX = centroX + Math.cos(anguloPlaneta) * radioOrbita; fuegoY = centroY + Math.sin(anguloPlaneta) * radioOrbita;
+        fuegoX = centroX + Math.cos(anguloPlaneta) * radioOrbita;
+        fuegoY = centroY + Math.sin(anguloPlaneta) * radioOrbita;
     }
 
-    let esferaActivaX = pivoteFuego ? hieloX : fuegoX; let esferaActivaY = pivoteFuego ? hieloY : fuegoY;
-    if (esferaActivaX - camaraScrollX > canvas.width - 160) camaraScrollX += 4;
-    if (esferaActivaX - camaraScrollX < 160) camaraScrollX -= 4;
-    if (esferaActivaY - camaraScrollY > canvas.height - 160) camaraScrollY += 4;
-    if (esferaActivaY - camaraScrollY < 160) camaraScrollY -= 4;
+    // Comprobar automáticamente si el jugador ignoró completamente el bloque y pasó de largo
+    let proximoBloque = bloquesRitmo[indiceBloqueActual + 1];
+    if (proximoBloque) {
+        let activeSphereX = pivoteFuego ? hieloX : fuegoX;
+        // Si la esfera activa ya pasó el eje X del bloque por mucho margen y no se tocó
+        if (activeSphereX > proximoBloque.x + 40) {
+            ejecutarFalloRitmo();
+        }
+    }
+
+    // Control de cámara suave
+    let esferaActivaX = pivoteFuego ? hieloX : fuegoX;
+    let esferaActivaY = pivoteFuego ? hieloY : fuegoY;
+    camaraScrollX += (esferaActivaX - camaraScrollX - canvas.width / 2) * 0.1;
+    camaraScrollY += (esferaActivaY - camaraScrollY - canvas.height / 2) * 0.1;
 
     ctx.save(); ctx.translate(-camaraScrollX, -camaraScrollY);
 
+    // Renderizado de la pista de bloques
     bloquesRitmo.forEach((bl, idx) => {
-        ctx.fillStyle = (idx === indiceBloqueActual) ? "#442266" : "#222233"; ctx.fillRect(bl.x - 20, bl.y - 20, 40, 40);
-        ctx.strokeStyle = (idx === indiceBloqueActual + 1 && toleranciaRitmoAcertado) ? "#00ffcc" : "#555"; ctx.strokeRect(bl.x - 20, bl.y - 20, 40, 40);
+        if (cuboFalloColorAzul && idx === indiceBloqueActual + 1) {
+            ctx.fillStyle = "#007bef"; // Se vuelve azul si fallás el toque
+        } else {
+            ctx.fillStyle = (idx <= indiceBloqueActual) ? "#442266" : "#222233";
+        }
+        ctx.fillRect(bl.x - 20, bl.y - 20, 40, 40);
+        ctx.strokeStyle = "#555"; ctx.strokeRect(bl.x - 20, bl.y - 20, 40, 40);
     });
 
-    ctx.fillStyle = "#ff2200"; ctx.beginPath(); ctx.arc(fuegoX, fuegoY, 15, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "#00aaff"; ctx.beginPath(); ctx.arc(hieloX, hieloY, 15, 0, Math.PI*2); ctx.fill();
+    // Planetas/Esferas orbitantes
+    ctx.fillStyle = "#ff2200"; ctx.beginPath(); ctx.arc(fuegoX, fuegoY, 13, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#00aaff"; ctx.beginPath(); ctx.arc(hieloX, hieloY, 13, 0, Math.PI*2); ctx.fill();
     ctx.restore();
 }
 
@@ -632,21 +654,15 @@ function actualizarModoShoot() {
 
     for (let i = listaCajasShoot.length - 1; i >= 0; i--) {
         let caja = listaCajasShoot[i]; caja.x += caja.vx * velSimulada; caja.y += caja.vy * velSimulada;
-        if(caja.tipo === "trampa") ctx.fillStyle = "#ff3333";
-        else if(caja.tipo === "slow") ctx.fillStyle = "#33ff33";
-        else if(caja.tipo === "mult") ctx.fillStyle = "#3399ff";
-        else ctx.fillStyle = "#ffaa00";
-
+        ctx.fillStyle = (caja.tipo === "trampa") ? "#ff3333" : "#ffaa00";
         ctx.fillRect(caja.x, caja.y, caja.w, caja.h);
-        ctx.strokeStyle = "white"; ctx.strokeRect(caja.x, caja.y, caja.w, caja.h);
         if (caja.y > canvas.height + 20) listaCajasShoot.splice(i, 1);
     }
 
     if (cargandoTiroShoot) {
-        ctx.strokeStyle = "rgba(163, 51, 255, 0.6)"; ctx.lineWidth = 3; ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = "rgba(163, 51, 255, 0.6)"; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(jugadorX, jugadorY - 15);
-        let dx = inicioToqueX - arrastreX; let dy = inicioToqueY - arrastreY;
-        ctx.lineTo(jugadorX + dx * 2, jugadorY - 15 + dy * 2); ctx.stroke(); ctx.setLineDash([]);
+        ctx.lineTo(jugadorX + (inicioToqueX - arrastreX) * 2, jugadorY - 15 + (inicioToqueY - arrastreY) * 2); ctx.stroke();
     }
 
     for (let i = misBalas.length - 1; i >= 0; i--) {
@@ -657,13 +673,8 @@ function actualizarModoShoot() {
 
             listaCajasShoot.forEach((caja, cIdx) => {
                 if (mb.x > caja.x && mb.x < caja.x + caja.w && mb.y > caja.y && mb.y < caja.y + caja.h) {
-                    ejecutarImpactoEspecialFX(caja.x + 20, caja.y + 20); // Animación customizada
-                    if (caja.tipo === "trampa") puntosPartida = Math.max(0, puntosPartida - 15);
-                    else if (caja.tipo === "slow") duracionSlowMo = 180;
-                    else if (caja.tipo === "mult") { factorMultiplicador = 2; setTimeout(() => { factorMultiplicador = 1; }, 5000); }
-                    else puntosPartida += 10 * factorMultiplicador;
-
-                    listaCajasShoot.splice(cIdx, 1); misBalas.splice(i, 1);
+                    ejecutarImpactoEspecialFX(caja.x + 20, caja.y + 20);
+                    puntosPartida += 10; listaCajasShoot.splice(cIdx, 1); misBalas.splice(i, 1);
                 }
             });
             if (mb.y < -20 || mb.x < -20 || mb.x > canvas.width + 20) misBalas.splice(i, 1);
@@ -671,31 +682,13 @@ function actualizarModoShoot() {
     }
 }
 
-// --- RENDER COMPLETO DEL GATO REAL ---
+// --- RENDER PERSONAJE ---
 function dibujarGatoReal(x, y) {
     let s = SKINS_GATOS[skinEquipada] || SKINS_GATOS["Default Cat"];
     ctx.fillStyle = s.aura; ctx.beginPath(); ctx.arc(x, y - 10, 40, 0, Math.PI*2); ctx.fill();
-
-    ctx.strokeStyle = s.principal; ctx.lineWidth = 6; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(x - 15, y + 25); ctx.quadraticCurveTo(x - 30, y + 10, x - 25, y - 5); ctx.stroke();
-
-    ctx.fillStyle = s.pecho; ctx.fillRect(x - 14, y + 22, 8, 10); ctx.fillRect(x + 6, y + 22, 8, 10);
-    ctx.fillStyle = s.principal; ctx.beginPath(); ctx.ellipse(x, y + 10, 18, 22, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = s.pecho; ctx.beginPath(); ctx.ellipse(x, y + 8, 10, 14, 0, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = s.principal; ctx.beginPath(); ctx.arc(x, y - 15, 16, 0, Math.PI*2); ctx.fill();
-
-    ctx.fillStyle = s.principal;
-    ctx.beginPath(); ctx.moveTo(x - 15, y - 22); ctx.lineTo(x - 16, y - 36); ctx.lineTo(x - 4, y - 26); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(x + 15, y - 22); ctx.lineTo(x + 16, y - 36); ctx.lineTo(x + 4, y - 26); ctx.fill();
-    ctx.fillStyle = "#ffb6c1";
-    ctx.beginPath(); ctx.moveTo(x - 13, y - 24); ctx.lineTo(x - 14, y - 32); ctx.lineTo(x - 6, y - 26); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(x + 13, y - 24); ctx.lineTo(x + 14, y - 32); ctx.lineTo(x + 6, y - 26); ctx.fill();
-
+    ctx.fillStyle = s.pecho; ctx.beginPath(); ctx.ellipse(x, y + 8, 10, 14, 0, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = s.ojos; ctx.fillRect(x - 8, y - 19, 4, 6); ctx.fillRect(x + 4, y - 19, 4, 6);
-    ctx.fillStyle = "#ffb6c1"; ctx.fillRect(x - 1, y - 13, 2, 2);
-    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x - 6, y - 12); ctx.lineTo(x - 16, y - 14); ctx.moveTo(x - 6, y - 11); ctx.lineTo(x - 15, y - 10);
-    ctx.moveTo(x + 6, y - 12); ctx.lineTo(x + 16, y - 14); ctx.moveTo(x + 6, y - 11); ctx.lineTo(x + 15, y - 10); ctx.stroke();
 }
 
 function renderSkins() {
@@ -703,14 +696,10 @@ function renderSkins() {
     div.innerHTML = Object.keys(SKINS_GATOS).map(name => `
         <div class="item-habilidad" onclick="equiparSkin('${name}')">
             <div style="font-weight:bold; color:${skinEquipada === name ? '#00ff66' : '#fff'}">${name}</div>
-            ${skinEquipada === name ? '<span style="color:#00ff66; font-size:11px; font-weight:bold;">EQUIPADA</span>' : '<button class="btn-comprar" style="background:#222; color:white;">USAR</button>'}
+            ${skinEquipada === name ? '<span style="color:#00ff66; font-size:11px;">EQUIPADA</span>' : '<button class="btn-comprar">USAR</button>'}
         </div>
     `).join('');
 }
 
-function equiparSkin(name) {
-    skinEquipada = name; guardarProgresoLocal(); renderSkins();
-}
-
+function equiparSkin(name) { skinEquipada = name; guardarProgresoLocal(); renderSkins(); }
 window.onload = () => { redimensionar(); generarEstrellas(); buclePrincipal(); };
-
