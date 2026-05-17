@@ -28,7 +28,7 @@
             height: 100%;
             z-index: 1;
         }
-        .pantalla {
+        .interfaz-html {
             position: absolute;
             top: 0;
             left: 0;
@@ -39,43 +39,6 @@
             align-items: center;
             justify-content: center;
             z-index: 10;
-            pointer-events: none;
-        }
-        .pantalla.activa {
-            display: flex;
-        }
-        .zona-interactiva {
-            pointer-events: auto;
-        }
-        .titulo-juego {
-            font-size: 26px;
-            color: #ff3c3c;
-            font-weight: bold;
-            text-shadow: 0 0 12px rgba(255, 60, 60, 0.6);
-            margin-bottom: 170px;
-            text-align: center;
-        }
-        .contenedor-botones {
-            display: flex;
-            flex-direction: column;
-            gap: 25px;
-        }
-        .btn-menu {
-            width: 260px;
-            height: 45px;
-            background: rgba(0, 255, 130, 0.02);
-            border: 1px solid rgba(0, 255, 130, 0.1);
-            color: #00ff82;
-            font-size: 13px;
-            font-weight: bold;
-            letter-spacing: 2px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .btn-menu:active {
-            background: rgba(0, 255, 130, 0.15);
         }
         #hud-juego {
             position: absolute;
@@ -88,6 +51,7 @@
             align-items: center;
             z-index: 20;
             color: #fff;
+            font-size: 14px;
         }
         .btn-pausa {
             background: #ff3c3c;
@@ -95,7 +59,6 @@
             color: white;
             padding: 5px 12px;
             font-weight: bold;
-            pointer-events: auto;
         }
         #menu-pausa {
             position: absolute;
@@ -115,7 +78,7 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            pointer-events: auto;
+            padding: 10px;
         }
         .item-habilidad {
             width: 260px;
@@ -126,6 +89,15 @@
             text-align: center;
             font-weight: bold;
         }
+        .btn-retroceso {
+            width: 260px;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid #00ff82;
+            color: #00ff82;
+            text-align: center;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -133,37 +105,23 @@
     <canvas id="canvasJuego"></canvas>
 
     <div id="hud-juego">
-        <div>Puntos: <span id="txt-puntos">0</span></div>
+        <div>ENERGÍA: <span id="txt-vida">30</span> / 30</div>
         <button class="btn-pausa" onclick="activarPausa(true)">PAUSA</button>
     </div>
 
-    <div id="pantalla-menu" class="pantalla">
-        <div class="titulo-juego">SHADOW CAT:<br>JUJUTSU CHRONICLES</div>
-        <div class="contenedor-botones zona-interactiva">
-            <div class="btn-menu" onclick="cambiarPantalla('juego-original')">MODO ORIGINAL</div>
-            <div class="btn-menu" onclick="cambiarPantalla('juego-ritmo')">DANCE OF FIRE</div>
-            <div class="btn-menu" onclick="cambiarPantalla('juego-shoot')">SHOOT THE BOX</div>
-            <div class="btn-menu" onclick="cambiarPantalla('hechiceros')">HECHICEROS (SKINS)</div>
-        </div>
-    </div>
-
-    <div id="pantalla-hechiceros" class="pantalla">
-        <h2 style="color:#a333ff; margin-bottom:20px;">EXPANSIÓN DE DOMINIO</h2>
+    <div id="pantalla-hechiceros" class="interfaz-html">
+        <h2 style="color:#a333ff; margin-bottom:30px;">SELECCIÓN DE HECHICEROS</h2>
         <div id="contenedor-hechiceros"></div>
-        <br>
-        <div class="btn-menu zona-interactiva" onclick="cambiarPantalla('menu')">VOLVER</div>
+        <br><br>
+        <div class="btn-retroceso" onclick="cambiarPantalla('menu')">VOLVER AL MENÚ</div>
     </div>
 
     <div id="menu-pausa">
         <h2>JUEGO EN PAUSA</h2>
-        <br>
-        <div class="contenedor-botones zona-interactiva">
-            <div class="btn-menu" onclick="activarPausa(false)">REANUDAR</div>
-            <div class="btn-menu" style="color:#ff3c3c;" onclick="volverAlMenuPrincipal()">SALIR</div>
-        </div>
+        <br><br>
+        <div class="btn-retroceso" style="border-color:#ff3c3c; color:#ff3c3c;" onclick="volverAlMenuPrincipal()">ABANDONAR PARTIDA</div>
     </div>
 
     <script src="sketch.js"></script>
 </body>
 </html>
-
