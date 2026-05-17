@@ -17,3 +17,4 @@ V1.09: fixed the game, now you can play
 V1.10: i think its finally fixed
 V1.11: pls be fixed now 
 V1.12: i really think this will fix the game
+V1.13: deleted loading screen
