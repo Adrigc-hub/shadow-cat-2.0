@@ -8,3 +8,4 @@ Update Information: updated the skins and effects, now it has more mini games et
 V1.01: made a sans type secret boss fight and 20 random attacks, fixed the random bullet problem and now you have a secret power
 V1.02: Perfect mini-games and more
 V1.03: added loading screen and fixed some issues
+V1.04: made the loading screen better, fixxed the secret boss fight being too hard, secret animation added
