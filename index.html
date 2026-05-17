@@ -15,7 +15,7 @@
             user-select: none;
             -webkit-user-select: none;
         }
-        /* Contenedor de Pantallas */
+        /* Contenedor General */
         .pantalla {
             position: absolute;
             width: 100%;
@@ -26,40 +26,41 @@
             justify-content: center;
             box-sizing: border-box;
             padding: 20px;
+            z-index: 5;
         }
         .activa {
             display: flex;
         }
-        /* Estilo de Menú Principal */
+        
         .titulo-principal {
-            font-size: 28px;
-            letter-spacing: 2px;
+            font-size: 26px;
+            letter-spacing: 1px;
             margin-bottom: 5px;
             text-align: center;
-            color: #ffffff;
+            font-weight: bold;
         }
         .subtitulo {
-            font-size: 12px;
+            font-size: 11px;
             color: #a333ff;
             margin-bottom: 30px;
             text-transform: uppercase;
             font-weight: bold;
         }
         .marcador-puntos {
-            font-size: 16px;
+            font-size: 15px;
             color: #ffcc00;
-            margin-bottom: 40px;
+            margin-bottom: 35px;
             font-weight: bold;
         }
-        /* Botones del Menú */
+        /* Botones de tu Menú */
         .btn-menu {
             width: 85%;
             max-width: 280px;
-            padding: 16px;
+            padding: 15px;
             margin: 8px 0;
             border: none;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             color: white;
             cursor: pointer;
@@ -73,54 +74,11 @@
         .btn-rosa { background-color: #e60067; }
         .btn-morado { background-color: #9000c7; }
 
-        /* HUD del Juego (Botón de Pausa arriba) */
-        #hud-partida {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: none;
-            z-index: 10;
-        }
-        .btn-pausa-hud {
-            padding: 10px 16px;
-            background: rgba(255,255,255,0.15);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        /* Menú de Pausa Flotante */
-        #menu-pausa {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(5, 5, 10, 0.85);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-        }
-        .caja-pausa {
-            background: #12121f;
-            border: 2px solid #333;
-            padding: 30px;
-            border-radius: 16px;
-            text-align: center;
-            width: 260px;
-        }
-
         /* Tienda de Habilidades */
         .lista-tienda {
             width: 90%;
             max-width: 320px;
-            max-height: 250px;
+            max-height: 220px;
             overflow-y: auto;
             background: #12121f;
             border-radius: 12px;
@@ -132,15 +90,18 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #222;
+            padding: 12px 10px;
+            border-bottom: 1px solid #1c1c2e;
+        }
+        .info-txt {
+            text-align: left;
         }
         .btn-comprar {
             background: #ffcc00;
             color: black;
             border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
+            padding: 8px 14px;
+            border-radius: 5px;
             font-weight: bold;
             cursor: pointer;
         }
@@ -149,60 +110,57 @@
             color: black;
         }
         
-        /* Lienzo de la partida */
-        canvas {
-            display: block;
-            background: #000;
+        /* El fondo interactivo del juego */
+        #canvasFondo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: #05050a;
         }
     </style>
 </head>
 <body>
 
-    <audio id="musica-menu" loop>
-        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" type="audio/mp3">
+    <audio id="musica-gd" loop>
+        <source src="https://audio.jofre.de/stayinsideme.mp3" type="audio/mp3">
     </audio>
 
-    <div id="hud-partida">
-        <button class="btn-pausa-hud" onclick="presionarPausa()">⏸ PAUSA</button>
-    </div>
-
-    <div id="menu-pausa">
-        <div class="caja-pausa">
-            <h2 style="margin-top: 0; color: #ffcc00; letter-spacing: 1px;">JUEGO PAUSADO</h2>
-            <button class="btn-menu btn-azul" style="width: 100%;" onclick="reanudarJuego()">REANUDAR</button>
-            <button class="btn-menu btn-rosa" style="width: 100%; margin-top: 10px;" onclick="regresarAlMenu()">REGRESAR AL MENU</button>
-        </div>
-    </div>
+    <canvas id="canvasFondo"></canvas>
 
     <div id="pantalla-menu" class="pantalla activa">
         <h1 class="titulo-principal">SHADOW CAT: JJK ARENA</h1>
-        <div class="subtitulo">Sistema de Batalla Manual y Sombreado Realista</div>
+        <div class="subtitulo">Físicas Anti-Fantasmas y Hitbox de Precisión</div>
         <div class="marcador-puntos">Puntos Acumulados: <span id="txt-puntos">100</span> PTS</div>
         
-        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego')">Entrar a Combate</button>
-        <button class="btn-menu btn-rosa" onclick="cambiarPantalla('hechiceros')">Hechiceros (13 Skins)</button>
-        <button class="btn-menu btn-morado" onclick="cambiarPantalla('tienda')">10 Habilidades Comprables</button>
+        <button class="btn-menu btn-azul" onclick="cambiarA('juego')">Entrar a Combate</button>
+        <button class="btn-menu btn-rosa" onclick="cambiarA('hechiceros')">Hechiceros (13 Skins)</button>
+        <button class="btn-menu btn-morado" onclick="cambiarA('tienda')">10 Habilidades Comprables</button>
     </div>
 
     <div id="pantalla-hechiceros" class="pantalla">
-        <h2>ALTA SELECCIÓN DE HECHICEROS</h2>
-        <p style="color: #888; font-size: 13px;">Toca tu personaje para seleccionarlo</p>
+        <h2>SELECCIÓN DE HECHICEROS</h2>
         <div class="lista-tienda" id="contenedor-hechiceros">
             </div>
-        <button class="btn-menu btn-rosa" onclick="cambiarPantalla('menu')">Volver al Menú</button>
+        <button class="btn-menu btn-rosa" onclick="cambiarA('menu')">Volver al Menú</button>
     </div>
 
     <div id="pantalla-tienda" class="pantalla">
         <h2>HABILIDADES COMPRABLES</h2>
         <div class="lista-tienda" id="contenedor-tienda">
             </div>
-        <button class="btn-menu btn-morado" onclick="cambiarPantalla('menu')">Volver al Menú</button>
+        <button class="btn-menu btn-morado" onclick="cambiarA('menu')">Volver al Menú</button>
     </div>
 
-    <div id="pantalla-juego" class="pantalla" style="padding: 0;">
-        <canvas id="lienzoJuego"></canvas>
+    <div id="pantalla-juego" class="pantalla">
+        <h2 style="color:#ffcc00;">¡EN COMBATE!</h2>
+        <p>Tu partida se está ejecutando en la arena...</p>
+        <button class="btn-menu btn-rosa" onclick="cambiarA('menu')">Salir al Menú</button>
     </div>
 
     <script src="sketch.js"></script>
 </body>
 </html>
+
