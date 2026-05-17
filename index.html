@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SHADOW CAT: ULTIMATE ARENA</title>
+    <title>SHADOW CAT: COLD REBOOT</title>
     <style>
         body {
             margin: 0; padding: 0;
-            background-color: #010103; color: white;
+            background-color: #020205; color: white;
             font-family: 'Segoe UI', Roboto, sans-serif;
             overflow: hidden; user-select: none; -webkit-user-select: none;
+            touch-action: none;
         }
         .pantalla {
             position: absolute; width: 100%; height: 100%;
@@ -27,9 +28,7 @@
             width: 85%; max-width: 280px; padding: 14px; margin: 8px 0;
             border: none; border-radius: 8px; font-size: 13px; font-weight: bold;
             color: white; cursor: pointer; text-transform: uppercase;
-            transition: transform 0.1s ease;
         }
-        .btn-menu:active { transform: scale(0.95); }
         .btn-azul { background: #007bef; }
         .btn-rosa { background: #e60067; }
         .btn-morado { background: #9000c7; }
@@ -74,7 +73,6 @@
             flex-direction: column; align-items: center; justify-content: center; z-index: 100;
         }
         
-        /* Botón flotante para detonar el Vacío Púrpura */
         #btn-purpura {
             position: absolute; bottom: 30px; right: 30px;
             width: 75px; height: 75px; background: #a333ff;
@@ -98,7 +96,7 @@
     <div id="btn-purpura" onclick="detonarIlimitadoPurpura()">PÚRPURA</div>
 
     <div id="hud-juego">
-        <div class="stats-hud" id="txt-hud-stats">Iniciando...</div>
+        <div class="stats-hud" id="txt-hud-stats">Cargando...</div>
         <button class="btn-pausa" onclick="activarPausa(true)">⏸ PAUSA</button>
     </div>
 
@@ -106,30 +104,30 @@
         <div style="background: #07070d; padding: 30px; border-radius: 14px; text-align: center; border: 1px solid #222;">
             <h3 style="margin-top:0; color:#ffcc00;">JUEGO PAUSADO</h3>
             <button class="btn-menu btn-azul" style="width:100%;" onclick="activarPausa(false)">Reanudar</button>
-            <button class="btn-menu btn-rosa" style="width:100%; margin-top:10px;" onclick="volverAlMenuPrincipal()">Menu Principal</button>
+            <button class="btn-menu btn-rosa" style="width:100%; margin-top:10px;" onclick="volverAlMenuPrincipal()">Menú Principal</button>
         </div>
     </div>
 
     <div id="pantalla-menu" class="pantalla activa">
-        <h1 class="titulo-principal">SHADOW CAT 2.5</h1>
-        <div class="subtitulo">Sans Bossfight & Pure Physics Engine</div>
-        <div class="marcador-puntos">Mis Puntos Totales: <span id="txt-puntos">100</span> PTS</div>
+        <h1 class="titulo-principal">SHADOW CAT 2.6</h1>
+        <div class="subtitulo">Controles Táctiles Calibrados & Modos Completos</div>
+        <div class="marcador-puntos">Puntos Guardados: <span id="txt-puntos">100</span> PTS</div>
         
         <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-original')">Modo Arena (Original)</button>
         <button class="btn-menu btn-verde" onclick="cambiarPantalla('juego-ritmo')">Dance of Fire and Ice</button>
-        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-shoot')">Shoot the Box</button>
+        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-shoot')">Shoot the Box Pro</button>
         <button class="btn-menu btn-rosa" onclick="cambiarPantalla('hechiceros')">Skins de Gatos</button>
         <button class="btn-menu btn-morado" onclick="cambiarPantalla('tienda')">Tienda</button>
     </div>
 
     <div id="pantalla-hechiceros" class="pantalla">
-        <h2>SKINS DISPONIBLES</h2>
+        <h2>SKINS DE GATOS</h2>
         <div class="lista-tienda" id="contenedor-hechiceros"></div>
         <button class="btn-menu btn-rosa" onclick="cambiarPantalla('menu')">Volver</button>
     </div>
 
     <div id="pantalla-tienda" class="pantalla">
-        <h2>TIENDA DE HABILIDADES</h2>
+        <h2>TIENDA DE ITEMS</h2>
         <div class="lista-tienda" id="contenedor-tienda"></div>
         <button class="btn-menu btn-morado" onclick="cambiarPantalla('menu')">Volver</button>
     </div>
