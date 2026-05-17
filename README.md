@@ -13,4 +13,5 @@ V1.05: fixxed the dance of fire and ice gamemode, fixxed hitboxes and fixxed the
 V1.06: added a secret🤫 
 V1.07: fixed the dance of fire and ice gamemode and added an extra animation on the loading screen
 V1.08: made the loading animation better and fixed the dance of fire and ice (yes again) 
-V1.09 fixed the game, now you can play 
+V1.09: fixed the game, now you can play 
+V1.10: i think its finally fixed
