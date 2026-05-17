@@ -15,3 +15,4 @@ V1.07: fixed the dance of fire and ice gamemode and added an extra animation on 
 V1.08: made the loading animation better and fixed the dance of fire and ice (yes again) 
 V1.09: fixed the game, now you can play 
 V1.10: i think its finally fixed
+V1.11: pls be fixed now 
