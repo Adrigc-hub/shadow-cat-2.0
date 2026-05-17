@@ -1,6 +1,6 @@
 // --- CONFIGURACIÓN PRINCIPAL ---
 let puntosAcumulados = 0;
-let modoActual = "menu"; // Arranca directamente en el menú principal
+let modoActual = "menu"; // Arranca directamente en el menú principal sin loaders
 let juegoPausado = false;
 let skinEquipada = "Default Cat";
 let audioCtx = null;
@@ -37,7 +37,7 @@ let inicioToqueX = 0, inicioToqueY = 0;
 let arrastreX = 0, arrastreY = 0;
 let tiempoUltimaCajaShoot = 0;
 
-// Control de Animación de Construcción del Menú
+// Control de Animación de Construcción del Menú (Efecto de rectángulos al cargar el link)
 let tiempoInicioMenu = 0;
 
 const canvas = document.getElementById("canvasJuego");
@@ -118,7 +118,7 @@ function playSound(tipo) {
 
     if (tipo === "click" || tipo === "hit") {
         osc.type = "sine"; osc.frequency.setValueAtTime(550, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.06, dynamicTime);
+        gain.gain.setValueAtTime(0.06, audioCtx.currentTime); // Error corregido aquí de variable indefinida
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
         osc.start(); osc.stop(audioCtx.currentTime + 0.08);
     }
@@ -139,7 +139,7 @@ function cambiarPantalla(destino) {
 
     if (destino === 'menu') {
         modoActual = "menu";
-        tiempoInicioMenu = Date.now(); // Reiniciar animación de construcción de las líneas
+        tiempoInicioMenu = Date.now(); // Reiniciar animación de construcción al volver al menú
         gestionarMusicaEstados();
         if(pMenu) pMenu.classList.add("activa");
     } else if (destino === 'hechiceros') {
@@ -262,13 +262,13 @@ function buclePrincipal() {
     ctx.fillStyle = "#020205"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Estrellas de fondo estables
+    // Fondo estelar
     ctx.fillStyle = "rgba(255,255,255,0.2)";
     estrellasFondo.forEach(st => { ctx.fillRect(st.x, st.y, st.size, st.size); });
 
     if (modoActual === "menu") {
         dibujarGatoEnBancaMenu();
-        animarLineasConstruccionMenu();
+        animarLineasConstruccionMenu(); // Los rectángulos poniéndose en su lugar
     } else if (!juegoPausado) {
         if (modoActual === "original") actualizarModoOriginal();
         else if (modoActual === "ritmo") actualizarModoRitmo();
@@ -284,29 +284,25 @@ function buclePrincipal() {
     requestAnimationFrame(buclePrincipal);
 }
 
-// --- ANIMACIÓN CENTRAL: GATO SENTADO EN BANCA MOVIENDO LA COLA ---
+// --- ANIMACIÓN GATO EN BANCA ---
 function dibujarGatoEnBancaMenu() {
     let cx = canvas.width / 2;
     let cy = canvas.height / 2 - 140; 
 
-    // Dibujar la Banca de Madera
     ctx.fillStyle = "#7a431d";
     ctx.fillRect(cx - 70, cy + 30, 140, 10); 
     ctx.fillStyle = "#5c3214";
-    ctx.fillRect(cx - 60, cy + 40, 8, 25);   // Pata Izquierda
-    ctx.fillRect(cx + 52, cy + 40, 8, 25);   // Pata Derecha
+    ctx.fillRect(cx - 60, cy + 40, 8, 25);   
+    ctx.fillRect(cx + 52, cy + 40, 8, 25);   
     ctx.fillRect(cx - 65, cy + 10, 6, 20);   
     ctx.fillRect(cx + 59, cy + 10, 6, 20);   
-    ctx.fillRect(cx - 70, cy, 140, 12);      // Respaldo
+    ctx.fillRect(cx - 70, cy, 140, 12);      
 
-    // Animación fluida de la cola oscilando con el tiempo
     let anguloCola = Math.sin(Date.now() * 0.007) * 0.45;
     let s = SKINS_GATOS[skinEquipada] || SKINS_GATOS["Default Cat"];
 
-    // Aura mística trasera
     ctx.fillStyle = s.aura; ctx.beginPath(); ctx.arc(cx, cy + 10, 35, 0, Math.PI*2); ctx.fill();
 
-    // Renderizado de la Colita Rítmica
     ctx.save();
     ctx.translate(cx - 12, cy + 24);
     ctx.rotate(anguloCola);
@@ -319,59 +315,60 @@ function dibujarGatoEnBancaMenu() {
     ctx.stroke();
     ctx.restore();
 
-    // Cuerpo y Cabeza
     ctx.fillStyle = s.principal;
     ctx.beginPath(); ctx.arc(cx, cy + 10, 14, 0, Math.PI*2); ctx.fill(); 
     ctx.fillStyle = s.pecho;
     ctx.beginPath(); ctx.ellipse(cx, cy + 26, 11, 10, 0, 0, Math.PI*2); ctx.fill(); 
 
-    // Orejas
     ctx.fillStyle = s.principal;
     ctx.beginPath(); ctx.moveTo(cx - 12, cy); ctx.lineTo(cx - 14, cy - 10); ctx.lineTo(cx - 4, cy - 4); ctx.fill();
     ctx.beginPath(); ctx.moveTo(cx + 12, cy); ctx.lineTo(cx + 14, cy - 10); ctx.lineTo(cx + 4, cy - 4); ctx.fill();
 
-    // Ojos brillantes de la Skin
     ctx.fillStyle = s.ojos;
     ctx.fillRect(cx - 5, cy + 5, 3, 5);
     ctx.fillRect(cx + 3, cy + 5, 3, 5);
 }
 
-// --- ANIMACIÓN DE CONTORNO: CONSTRUCCIÓN EFECTO MATRIX/NEÓN ---
+// --- NUEVA ANIMACIÓN DE ENSAMBLAJE DE RECTÁNGULOS AL REFRESCAR EL LINK ---
 function animarLineasConstruccionMenu() {
     let cx = canvas.width / 2;
     let cy = canvas.height / 2;
     
-    // Progreso automático basado en los primeros 2 segundos desde que se cargó el menú
     let transcurrido = Date.now() - tiempoInicioMenu;
-    let pct = Math.min(1, transcurrido / 2000); 
+    let pct = Math.min(1, transcurrido / 1200); // Animación rápida e impactante de 1.2 segundos
 
-    ctx.strokeStyle = "rgba(0, 255, 130, 0.8)";
     ctx.lineWidth = 2;
 
-    // Coordenadas aproximadas de los botones del menú en pantalla para simular su escaneo
+    // Simular el trazado neón en las zonas exactas donde están los botones HTML del menú
     let posicionesY = [cy - 60, cy + 10, cy + 80];
     let anchoCaja = 260;
     let progresoAncho = anchoCaja * pct;
 
-    posicionesY.forEach(y => {
+    posicionesY.forEach((y, i) => {
+        // Alternamos colores neón JJK por cada capa de botón en la carga
+        ctx.strokeStyle = i === i ? "rgba(0, 255, 130, 0.85)" : "rgba(163, 51, 255, 0.85)";
+        
+        ctx.save();
+        // Efecto donde las cajas se expanden desde el centro a los lados
         ctx.beginPath();
-        // Línea superior izquierda a derecha
-        ctx.moveTo(cx - 130, y);
-        ctx.lineTo(cx - 130 + progresoAncho, y);
-        // Línea inferior derecha a izquierda
-        ctx.moveTo(cx + 130, y + 45);
-        ctx.lineTo(cx + 130 - progresoAncho, y + 45);
+        ctx.moveTo(cx - progresoAncho / 2, y);
+        ctx.lineTo(cx + progresoAncho / 2, y);
+        ctx.lineTo(cx + progresoAncho / 2, y + 45);
+        ctx.lineTo(cx - progresoAncho / 2, y + 45);
+        ctx.closePath();
         ctx.stroke();
+        ctx.restore();
     });
 
     if (pct < 1) {
         ctx.fillStyle = "rgba(0, 255, 130, 0.9)";
-        ctx.font = "13px Courier New";
-        ctx.fillText(`CONSTRUYENDO INTERFAZ VECTORIAL...`, cx - 130, cy - 90);
+        ctx.font = "bold 12px Courier New";
+        ctx.textAlign = "center";
+        ctx.fillText(`INITIALIZING INTERFACE_ CORE...`, cx, cy - 95);
     }
 }
 
-// --- MODOS DE JUEGO ---
+// --- CONFIGURACIÓN DE MODOS DE JUEGO ---
 function actualizarModoOriginal() {
     if (Math.random() < 0.02) objetivosOriginales.push({ x: Math.random() * (canvas.width - 50), y: -40 });
     if (Math.random() < 0.025) balasCaendo.push({ x: Math.random() * canvas.width, y: -20, vy: 3 });
@@ -483,19 +480,20 @@ function renderSkins() {
 
 function equiparSkin(name) { skinEquipada = name; guardarProgresoLocal(); renderSkins(); }
 
-// --- INICIALIZACIÓN DIRECTA ---
+// --- ENTRADA AUTOMÁTICA DIRECTA ---
 window.onload = () => { 
     redimensionar(); 
     generarEstrellas(); 
     cargarProgresoGuardado(); 
-    tiempoInicioMenu = Date.now(); // Iniciar contador de la animación
+    tiempoInicioMenu = Date.now(); // Inicia la animación de ensamble neón de inmediato
     
-    // Ocultar la pantalla de carga vieja si seguía en tu HTML para evitar que tape el Canvas
+    // Matar forzosamente cualquier residuo visual del loader viejo en el DOM
     let pCarga = document.getElementById("pantalla-carga");
-    if(pCarga) pCarga.style.display = "none"; 
+    if(pCarga) pCarga.remove(); 
     
     let pMenu = document.getElementById("pantalla-menu");
     if(pMenu) pMenu.classList.add("activa");
 
     buclePrincipal(); 
 };
+
