@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SHADOW CAT: JJK ARENA 2.0</title>
+    <title>SHADOW CAT: ULTIMATE ARENA</title>
     <style>
         body {
             margin: 0; padding: 0;
-            background-color: #020205; color: white;
+            background-color: #010103; color: white;
             font-family: 'Segoe UI', Roboto, sans-serif;
             overflow: hidden; user-select: none; -webkit-user-select: none;
         }
@@ -19,36 +19,36 @@
         }
         .activa { display: flex; }
         
-        .titulo-principal { font-size: 28px; letter-spacing: 2px; margin-bottom: 5px; text-align: center; font-weight: bold; color: #fff; text-shadow: 0 0 10px #9000c7; }
-        .subtitulo { font-size: 11px; color: #a333ff; margin-bottom: 30px; text-transform: uppercase; font-weight: bold; }
-        .marcador-puntos { font-size: 16px; color: #ffcc00; margin-bottom: 35px; font-weight: bold; }
+        .titulo-principal { font-size: 26px; letter-spacing: 2px; margin-bottom: 5px; text-align: center; font-weight: bold; color: #fff; text-shadow: 0 0 12px #9000c7; }
+        .subtitulo { font-size: 11px; color: #a333ff; margin-bottom: 25px; text-transform: uppercase; font-weight: bold; }
+        .marcador-puntos { font-size: 15px; color: #ffcc00; margin-bottom: 30px; font-weight: bold; }
         
         .btn-menu {
             width: 85%; max-width: 280px; padding: 14px; margin: 8px 0;
             border: none; border-radius: 8px; font-size: 13px; font-weight: bold;
             color: white; cursor: pointer; text-transform: uppercase;
-            transition: transform 0.1s ease, box-shadow 0.2s;
+            transition: transform 0.1s ease;
         }
         .btn-menu:active { transform: scale(0.95); }
-        .btn-azul { background: #007bef; box-shadow: 0 4px 10px rgba(0,123,239,0.3); }
-        .btn-rosa { background: #e60067; box-shadow: 0 4px 10px rgba(230,0,103,0.3); }
-        .btn-morado { background: #9000c7; box-shadow: 0 4px 10px rgba(144,0,199,0.3); }
-        .btn-verde { background: #00b359; box-shadow: 0 4px 10px rgba(0,179,89,0.3); }
+        .btn-azul { background: #007bef; }
+        .btn-rosa { background: #e60067; }
+        .btn-morado { background: #9000c7; }
+        .btn-verde { background: #00b359; }
 
         .lista-tienda {
-            width: 90%; max-width: 320px; max-height: 250px;
-            overflow-y: auto; background: #0b0b12; border: 1px solid #1c1c3a;
+            width: 90%; max-width: 320px; max-height: 240px;
+            overflow-y: auto; background: #07070d; border: 1px solid #1a1a30;
             border-radius: 12px; padding: 10px; box-sizing: border-box; margin-bottom: 20px;
         }
         .item-habilidad {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 10px; border-bottom: 1px solid #141424;
+            padding: 12px 10px; border-bottom: 1px solid #11111e;
         }
         .btn-comprar {
             background: #ffcc00; color: black; border: none;
             padding: 8px 14px; border-radius: 5px; font-weight: bold; cursor: pointer;
         }
-        .btn-comprar.adquirido { background: #00ff66; color: black; }
+        .btn-comprar.adquirido { background: #00ff66; }
 
         #hud-juego {
             position: absolute; top: 15px; left: 0; width: 100%;
@@ -57,9 +57,10 @@
             z-index: 10; pointer-events: none;
         }
         .stats-hud {
-            color: white; font-size: 14px; font-weight: bold;
-            text-shadow: 1px 1px 3px black; pointer-events: auto;
-            background: rgba(0,0,0,0.4); padding: 6px 12px; border-radius: 6px;
+            color: white; font-size: 13px; font-weight: bold;
+            text-shadow: 1px 1px 2px black; pointer-events: auto;
+            background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 6px;
+            border: 1px solid #222;
         }
         .btn-pausa {
             padding: 8px 14px; background: rgba(255,255,255,0.15);
@@ -69,9 +70,20 @@
 
         #menu-pausa {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(3, 3, 8, 0.9); display: none;
+            background: rgba(2, 2, 5, 0.9); display: none;
             flex-direction: column; align-items: center; justify-content: center; z-index: 100;
         }
+        
+        /* Botón flotante para detonar el Vacío Púrpura */
+        #btn-purpura {
+            position: absolute; bottom: 30px; right: 30px;
+            width: 75px; height: 75px; background: #a333ff;
+            border: 3px solid white; border-radius: 50%;
+            color: white; font-weight: bold; font-size: 11px;
+            display: none; align-items: center; justify-content: center;
+            box-shadow: 0 0 15px #a333ff; z-index: 50; cursor: pointer;
+        }
+
         #canvasJuego { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
     </style>
 </head>
@@ -83,41 +95,43 @@
 
     <canvas id="canvasJuego"></canvas>
 
+    <div id="btn-purpura" onclick="detonarIlimitadoPurpura()">PÚRPURA</div>
+
     <div id="hud-juego">
-        <div class="stats-hud" id="txt-hud-stats">Cargando partida...</div>
+        <div class="stats-hud" id="txt-hud-stats">Iniciando...</div>
         <button class="btn-pausa" onclick="activarPausa(true)">⏸ PAUSA</button>
     </div>
 
     <div id="menu-pausa">
-        <div style="background: #0b0b12; padding: 30px; border-radius: 14px; text-align: center; border: 1px solid #222;">
-            <h3 style="margin-top:0; color:#ffcc00; letter-spacing:1px;">JUEGO EN PAUSA</h3>
+        <div style="background: #07070d; padding: 30px; border-radius: 14px; text-align: center; border: 1px solid #222;">
+            <h3 style="margin-top:0; color:#ffcc00;">JUEGO PAUSADO</h3>
             <button class="btn-menu btn-azul" style="width:100%;" onclick="activarPausa(false)">Reanudar</button>
-            <button class="btn-menu btn-rosa" style="width:100%; margin-top:10px;" onclick="volverAlMenuPrincipal()">Salir al Menú</button>
+            <button class="btn-menu btn-rosa" style="width:100%; margin-top:10px;" onclick="volverAlMenuPrincipal()">Menu Principal</button>
         </div>
     </div>
 
     <div id="pantalla-menu" class="pantalla activa">
-        <h1 class="titulo-principal">SHADOW CAT 2.0</h1>
-        <div class="subtitulo">Jujutsu Evolution & Físicas Rítmicas</div>
-        <div class="marcador-puntos">Puntos Totales: <span id="txt-puntos">100</span> PTS</div>
+        <h1 class="titulo-principal">SHADOW CAT 2.5</h1>
+        <div class="subtitulo">Sans Bossfight & Pure Physics Engine</div>
+        <div class="marcador-puntos">Mis Puntos Totales: <span id="txt-puntos">100</span> PTS</div>
         
-        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-original')">Jugar Original</button>
+        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-original')">Modo Arena (Original)</button>
         <button class="btn-menu btn-verde" onclick="cambiarPantalla('juego-ritmo')">Dance of Fire and Ice</button>
         <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-shoot')">Shoot the Box</button>
-        <button class="btn-menu btn-rosa" onclick="cambiarPantalla('hechiceros')">Selección de Skins</button>
-        <button class="btn-menu btn-morado" onclick="cambiarPantalla('tienda')">Tienda de Mejoras</button>
+        <button class="btn-menu btn-rosa" onclick="cambiarPantalla('hechiceros')">Skins de Gatos</button>
+        <button class="btn-menu btn-morado" onclick="cambiarPantalla('tienda')">Tienda</button>
     </div>
 
     <div id="pantalla-hechiceros" class="pantalla">
-        <h2>SELECTOR DE SKINS</h2>
+        <h2>SKINS DISPONIBLES</h2>
         <div class="lista-tienda" id="contenedor-hechiceros"></div>
-        <button class="btn-menu btn-rosa" onclick="cambiarPantalla('menu')">Volver al Menú</button>
+        <button class="btn-menu btn-rosa" onclick="cambiarPantalla('menu')">Volver</button>
     </div>
 
     <div id="pantalla-tienda" class="pantalla">
-        <h2>TIENDA DE MEJORAS</h2>
+        <h2>TIENDA DE HABILIDADES</h2>
         <div class="lista-tienda" id="contenedor-tienda"></div>
-        <button class="btn-menu btn-morado" onclick="cambiarPantalla('menu')">Volver al Menú</button>
+        <button class="btn-menu btn-morado" onclick="cambiarPantalla('menu')">Volver</button>
     </div>
 
     <script src="sketch.js"></script>
