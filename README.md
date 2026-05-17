@@ -22,3 +22,4 @@ V1.14: just a test.
 V1.15: added the loading screen again, added more effects and fixed some issues.
 V1.16: fixed a bug on the main menu.
 V1.17: added builder, online levels and some skills 
+V1.18: MASSIVE secret update
