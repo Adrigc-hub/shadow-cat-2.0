@@ -42,7 +42,7 @@ let listaAtaquesFase = [];
 let temporizadorBancaIntro = 0;
 let bancaCortada = false;
 
-// Mecánicas Dance of Fire (COORDENADAS CORREGIDAS AL CUBO GRIS)
+// Mecánicas Dance of Fire
 let bloquesRitmo = [];
 let indiceBloqueActual = 0;
 let fuegoX = 0, fuegoY = 0, hieloX = 0, hieloY = 0, anguloPlaneta = 0;
@@ -126,14 +126,6 @@ function gestionarMusicaEstados() {
         delayNode.connect(audioCtx.destination);
 
         nodoMusicaMenu.start();
-
-        setInterval(() => {
-            if(modoActual === "menu" && nodoMusicaMenu) {
-                let notasEspacio = [146.83, 164.81, 196.00, 220.00];
-                let proximaNota = notasEspacio[Math.floor(Math.random() * notasEspacio.length)];
-                nodoMusicaMenu.frequency.exponentialRampToValueAtTime(proximaNota, audioCtx.currentTime + 1.5);
-            }
-        }, 2000);
     } 
     else if (modoActual !== "menu" && nodoMusicaMenu) {
         try { nodoMusicaMenu.stop(); } catch(e){}
@@ -246,11 +238,11 @@ window.addEventListener('pointerdown', (e) => {
                 anguloPlaneta = Math.PI; 
                 
                 if (indiceBloqueActual >= bloquesRitmo.length - 1) {
-                    alert("¡Ritmo dominado a la perfección!"); 
+                    alert("¡Ritmo dominado!"); 
                     volverAlMenuPrincipal();
                 }
             } else {
-                setTimeout(() => { alert("¡Fallo de sincronización rítmica!"); volverAlMenuPrincipal(); }, 200);
+                setTimeout(() => { alert("¡Fallo de ritmo!"); volverAlMenuPrincipal(); }, 200);
             }
         }
     }
@@ -294,9 +286,11 @@ function generarCaminoBloquesRitmo() {
     anguloPlaneta = 0;
 }
 
-// --- LOOP PRINCIPAL CORREGIDO (NUNCA SE TRABA) ---
+// --- LOOP PRINCIPAL DE RENDERIZADO COMPLETAMENTE FIJADO ---
 function buclePrincipal() {
-    ctx.fillStyle = "#020205"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Forzar limpieza negra de fondo siempre
+    ctx.fillStyle = "#020205"; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (modoActual === "carga") {
         ejecutarProcesamientoCargaMatricial();
@@ -312,7 +306,6 @@ function buclePrincipal() {
         dibujarGatoEnBancaMenu();
     } else if (!juegoPausado) {
         if (modoActual === "original") actualizarModoOriginal();
-        else if (modoActual === "jefe_secreto") actualizarModoSukuna();
         else if (modoActual === "ritmo") actualizarModoRitmo();
         else if (modoActual === "shoot") actualizarModoShoot();
 
@@ -326,31 +319,29 @@ function buclePrincipal() {
     requestAnimationFrame(buclePrincipal);
 }
 
-// --- ANIMACIÓN: GATO EN BANCA MOVIENDO LA COLA (MENÚ PRINCIPAL) ---
+// --- ANIMACIÓN: GATO EN BANCA MOVIENDO LA COLA EN EL MENÚ ---
 function dibujarGatoEnBancaMenu() {
     let cx = canvas.width / 2;
-    let cy = canvas.height / 2 - 120; // Situado estratégicamente arriba de tus botones HTML
+    let cy = canvas.height / 2 - 130; 
 
     // Dibujar la Banca de Madera de fondo
     ctx.fillStyle = "#7a431d";
-    ctx.fillRect(cx - 70, cy + 30, 140, 10); // Asiento
+    ctx.fillRect(cx - 70, cy + 30, 140, 10); 
     ctx.fillStyle = "#5c3214";
-    ctx.fillRect(cx - 60, cy + 40, 8, 25);   // Pata izquierda
-    ctx.fillRect(cx + 52, cy + 40, 8, 25);   // Pata derecha
-    ctx.fillRect(cx - 65, cy + 10, 6, 20);   // Soporte respaldo izquierdo
-    ctx.fillRect(cx + 59, cy + 10, 6, 20);   // Soporte respaldo derecho
-    ctx.fillRect(cx - 70, cy, 140, 12);      // Respaldo horizontal
+    ctx.fillRect(cx - 60, cy + 40, 8, 25);   
+    ctx.fillRect(cx + 52, cy + 40, 8, 25);   
+    ctx.fillRect(cx - 65, cy + 10, 6, 20);   
+    ctx.fillRect(cx + 59, cy + 10, 6, 20);   
+    ctx.fillRect(cx - 70, cy, 140, 12);      
 
-    // Lógica rítmica de la colita del gato (Usa seno basado en los cuadros de animación)
+    // Lógica rítmica de la colita del gato
     let anguloCola = Math.sin(Date.now() * 0.006) * 0.4;
-
-    // Obtener colores de la Skin
     let s = SKINS_GATOS[skinEquipada] || SKINS_GATOS["Default Cat"];
 
-    // Aura sutil flotante
+    // Aura flotante
     ctx.fillStyle = s.aura; ctx.beginPath(); ctx.arc(cx, cy + 10, 35, 0, Math.PI*2); ctx.fill();
 
-    // Dibujar la Colita Rítmica (Atrás del cuerpo)
+    // Dibujar la Colita Rítmica
     ctx.save();
     ctx.translate(cx - 12, cy + 24);
     ctx.rotate(anguloCola);
@@ -365,19 +356,19 @@ function dibujarGatoEnBancaMenu() {
 
     // Cuerpo del gato sentado
     ctx.fillStyle = s.principal;
-    ctx.beginPath(); ctx.arc(cx, cy + 10, 14, 0, Math.PI*2); ctx.fill(); // Cabeza
+    ctx.beginPath(); ctx.arc(cx, cy + 10, 14, 0, Math.PI*2); ctx.fill(); 
     ctx.fillStyle = s.pecho;
-    ctx.beginPath(); ctx.ellipse(cx, cy + 26, 11, 10, 0, 0, Math.PI*2); ctx.fill(); // Pecho/Cuerpo
+    ctx.beginPath(); ctx.ellipse(cx, cy + 26, 11, 10, 0, 0, Math.PI*2); ctx.fill(); 
 
-    // Orejitas puntudas
+    // Orejitas
     ctx.fillStyle = s.principal;
     ctx.beginPath(); ctx.moveTo(cx - 12, cy); ctx.lineTo(cx - 14, cy - 10); ctx.lineTo(cx - 4, cy - 4); ctx.fill();
     ctx.beginPath(); ctx.moveTo(cx + 12, cy); ctx.lineTo(cx + 14, cy - 10); ctx.lineTo(cx + 4, cy - 4); ctx.fill();
 
-    // Ojitos brillantes de la Skin
+    // Ojitos
     ctx.fillStyle = s.ojos;
-    ctx.fillRect(cx - 6, cy + 6, 3, 5);
-    ctx.fillRect(cx + 3, cy + 6, 3, 5);
+    ctx.fillRect(cx - 5, cy + 5, 3, 5);
+    ctx.fillRect(cx + 3, cy + 5, 3, 5);
 }
 
 // --- ANIMACIÓN DE CARGA VECTORIAL PASO A PASO ---
@@ -417,11 +408,11 @@ function ejecutarProcesamientoCargaMatricial() {
         for (let i = rayosConstruccion.length - 1; i >= 0; i--) {
             let r = rayosConstruccion[i];
             ctx.strokeStyle = `rgba(0, 255, 130, ${r.duracion / 10})`;
-            ctx.beginPath(); ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); stroke();
             r.duracion--; if (r.duracion <= 0) rayosConstruccion.splice(i, 1);
         }
 
-        // Dibujo secuencial de los tres rectángulos del menú
+        // Dibujo progresivo real
         ctx.strokeStyle = "rgb(0, 255, 130)";
         ctx.lineWidth = 3;
         
@@ -449,7 +440,7 @@ function ejecutarProcesamientoCargaMatricial() {
     }
 }
 
-// --- MODO ORIGINAL (REPARADO Y FLUIDO) ---
+// --- MODO ORIGINAL (FLUIDO Y OPERATIVO) ---
 function actualizarModoOriginal() {
     if (Math.random() < 0.02) objetivosOriginales.push({ x: Math.random() * (canvas.width - 50), y: -40 });
     if (Math.random() < 0.025) balasCaendo.push({ x: Math.random() * canvas.width, y: -20, vy: 3 });
@@ -465,14 +456,12 @@ function actualizarModoOriginal() {
         if (obj.y > canvas.height) objetivosOriginales.splice(idx, 1);
     });
 
-    // Movimiento vertical sin interrupción para las balas del jugador
     ctx.fillStyle = "#a333ff";
     for (let i = misBalas.length - 1; i >= 0; i--) {
         let mb = misBalas[i];
         mb.y += mb.vy; 
         ctx.fillRect(mb.x - 3, mb.y, 6, 15);
 
-        // Colisión limpia contra bloques amarillos
         for (let o = objetivosOriginales.length - 1; o >= 0; o--) {
             let obj = objetivosOriginales[o];
             if (mb.x > obj.x && mb.x < obj.x + 35 && mb.y > obj.y && mb.y < obj.y + 35) {
@@ -483,7 +472,6 @@ function actualizarModoOriginal() {
             }
         }
 
-        // Colisión limpia contra el Mini Boss
         if (miniBossActivo && mb.x > miniBossX - 45 && mb.x < miniBossX + 45 && mb.y > miniBossY && mb.y < miniBossY + 50) {
             miniBossHP--;
             misBalas.splice(i, 1);
@@ -508,7 +496,6 @@ function actualizarModoOriginal() {
     }
 }
 
-// --- OTROS MÉTODOS Y RENDERS STUB ---
 function actualizarModoSukuna() {}
 
 function actualizarModoRitmo() {
@@ -567,8 +554,11 @@ function renderSkins() {
 
 function equiparSkin(name) { skinEquipada = name; guardarProgresoLocal(); renderSkins(); }
 
+// ARRANQUE AUTOMÁTICO CORREGIDO
 window.onload = () => { 
     redimensionar(); 
     generarEstrellas(); 
     cargarProgresoGuardado(); 
+    buclePrincipal(); // Activa el motor gráfico de inmediato
 };
+
