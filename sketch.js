@@ -1,48 +1,47 @@
-// --- VARIABLES DEL MOTOR ---
+// --- VARIABLES GLOBALES DEL MOTOR ---
 let puntosAcumulados = 100;
 let modoActual = "menu";
 let juegoPausado = false;
 let skinEquipada = "Gojo Satoru";
 let musicaSonando = false;
 
-// Datos de Configuración
 const HABILIDADES = [
-    { nombre: "Escudo Temporal", precio: 50, comprado: false },
-    { nombre: "Escudo Automático", precio: 30, comprado: false },
-    { nombre: "Auto-Aim Legendario", precio: 1000, comprado: false }
+    { nombre: "Escudo de Vacío", precio: 50, comprado: false },
+    { nombre: "Automático", precio: 30, comprado: false }
 ];
 
 const SKINS_HECHICEROS = {
-    "Gojo Satoru": { cuerpo: "#110022", aura: "#00d2ff", cuernos: true },
-    "Yuji Itadori": { cuerpo: "#2b0a0a", aura: "#ff3c3c", cuernos: true },
-    "Megumi Fushiguro": { cuerpo: "#05160e", aura: "#00ff88", cuernos: false },
-    "Nobara Kugisaki": { cuerpo: "#1c100b", aura: "#ff0077", cuernos: false }
+    "Gojo Satoru": { cuerpo: "#0c0214", aura: "#00d2ff" },
+    "Yuji Itadori": { cuerpo: "#210505", aura: "#ff3c3c" },
+    "Megumi Fushiguro": { cuerpo: "#030f0a", aura: "#00ff88" }
 };
 
-// Variables de Físicas y Entidades
-let jugadorX = 200, jugadorY = 400;
-let misBalas = [], objetivosOriginales = [], balasCaendo = [];
-let estrellasFondo = [];
-let energiaMaldita = 0;
-let puntosPartida = 0;
+// Sistema de Entidades
+let jugadorX = 200, jugadorY = 400, jugadorHP = 10;
+let misBalas = [], objetivosOriginales = [], balasCaendo = [], particulasChispas = [];
+let estrellasFondo = [], energiaMaldita = 0, puntosPartida = 0;
 
-// Variables de Boss y Transiciones Reales (Viejo Prototipo)
+// Configuración de Ataques y Estados Especiales
+let purpuraActivoContador = 0;
 let miniBossActivo = false;
 let miniBossHP = 20;
-let miniBossX = 200, miniBossY = 120, miniBossVX = 3;
+let miniBossX = 200, miniBossY = 90, miniBossVX = 3;
 let tiempoUltimoBossCheck = 0;
-let animacionSecretaContador = 0;
-let faseJefeSecreto = false;
+
+// Variables de la Arena de Sans (Jefe Secreto)
+let faseJefeSecreto = 1; 
 let jefeSecretoHP = 100;
+let cuadroSans = { x: 0, y: 0, w: 260, h: 260 }; 
+let temporizadorAtaqueFase = 0;
+let listaAtaquesFase = []; 
+let textoRefusedContador = 0;
 
-// Variables Dance of Fire and Ice (Físicas Reales de Pivote Rítmico)
-let fuegoX = 0, fuegoY = 0, hieloX = 0, hieloY = 0;
-let anguloPlaneta = 0;
-let pivoteFuego = true; // Define cuál esfera está estática sirviendo de eje
-let velocidadAngular = 0.06;
+// Variables Dance of Fire and Ice
+let fuegoX = 0, fuegoY = 0, hieloX = 0, hieloY = 0, anguloPlaneta = 0;
+let pivoteFuego = true, velocidadAngular = 0.06;
 
-// Variables Shoot the Box con Gravedad Física
-let cajaShoot = { x: 100, y: 100, vx: 4, vy: 2, gravedad: 0.15, tamaño: 65 };
+// Variables Shoot the Box
+let cajaShoot = { x: 100, y: 100, vx: 4, vy: 2, gravedad: 0.16, tamaño: 60 };
 
 const canvas = document.getElementById("canvasJuego");
 const ctx = canvas.getContext("2d");
@@ -53,27 +52,29 @@ function redimensionar() {
 }
 window.addEventListener('resize', redimensionar);
 
-// --- INICIALIZADOR DE ESTRELLAS (ESTILO ESPACIAL VIEJO) ---
 function generarEstrellas() {
     estrellasFondo = [];
-    for(let i=0; i<60; i++) {
-        estrellasFondo.push({ x: Math.random()*window.innerWidth, y: Math.random()*window.innerHeight, s: Math.random()*2 });
+    for(let i=0; i<50; i++) {
+        estrellasFondo.push({ x: Math.random()*window.innerWidth, y: Math.random()*window.innerHeight, s: Math.random()*1.5 });
     }
 }
 
-// --- NAVEGACIÓN ---
+// --- NAVEGADOR DE PANTALLAS ---
 function cambiarPantalla(destino) {
     document.getElementById("pantalla-menu").classList.remove("activa");
     document.getElementById("pantalla-hechiceros").classList.remove("activa");
     document.getElementById("pantalla-tienda").classList.remove("activa");
     document.getElementById("hud-juego").style.display = "none";
+    document.getElementById("btn-purpura").style.display = "none";
 
     juegoPausado = false;
     miniBossActivo = false;
-    faseJefeSecreto = false;
-    animacionSecretaContador = 0;
+    textoRefusedContador = 0;
     energiaMaldita = 0;
     puntosPartida = 0;
+    jugadorHP = 10;
+    purpuraActivoContador = 0;
+    faseJefeSecreto = 1;
 
     if (destino === 'menu') {
         modoActual = "menu";
@@ -87,24 +88,13 @@ function cambiarPantalla(destino) {
     } else {
         document.getElementById("hud-juego").style.display = "flex";
         jugadorX = canvas.width / 2;
-        jugadorY = canvas.height - 120;
-        misBalas = []; objetivosOriginales = []; balasCaendo = [];
+        jugadorY = canvas.height - 140;
+        misBalas = []; objetivosOriginales = []; balasCaendo = []; particulasChispas = [];
         tiempoUltimoBossCheck = Date.now();
 
-        if (destino === 'juego-original') {
-            modoActual = "original";
-        }
-        if (destino === 'juego-ritmo') {
-            modoActual = "ritmo";
-            fuegoX = canvas.width / 2;
-            fuegoY = canvas.height / 2;
-            anguloPlaneta = 0;
-            pivoteFuego = true;
-        }
-        if (destino === 'juego-shoot') {
-            modoActual = "shoot";
-            reajustarCajaShoot();
-        }
+        if (destino === 'juego-original') modoActual = "original";
+        if (destino === 'juego-ritmo') { modoActual = "ritmo"; fuegoX = canvas.width/2; fuegoY = canvas.height/2; anguloPlaneta = 0; pivoteFuego = true; }
+        if (destino === 'juego-shoot') { modoActual = "shoot"; reajustarCajaShoot(); }
     }
     encenderMusicaGD();
 }
@@ -121,246 +111,344 @@ function volverAlMenuPrincipal() {
     cambiarPantalla('menu');
 }
 
-// --- CLICS Y TOCADOS ---
+// --- GESTIÓN DE ENTRADAS TÁCTILES ---
 window.addEventListener('pointerdown', (e) => {
     encenderMusicaGD();
-    if (juegoPausado || modoActual === "menu") return;
+    if (juegoPausado || modoActual === "menu" || textoRefusedContador > 0) return;
 
-    if (modoActual === "original" || modoActual === "jefe_secreto") {
-        // Disparo idéntico al viejo prototipo (Orbes morados encadenados)
-        misBalas.push({ x: jugadorX, y: jugadorY - 25 });
+    // SISTEMA ORIGINAL: Presionar directamente el bloque objetivo para dispararle
+    if (modoActual === "original") {
+        let presionoObjetivo = false;
+        
+        objetivosOriginales.forEach(obj => {
+            if (e.clientX >= obj.x && e.clientX <= obj.x + 35 && e.clientY >= obj.y && e.clientY <= obj.y + 35) {
+                presionoObjetivo = true;
+                // Disparar orbe directo hacia la posición del objetivo clickeado
+                misBalas.push({ x: jugadorX, y: jugadorY - 20, targetX: obj.x + 17, targetY: obj.y + 17 });
+            }
+        });
+
+        if (miniBossActivo && e.clientX >= miniBossX - 40 && e.clientX <= miniBossX + 40 && e.clientY >= miniBossY && e.clientY <= miniBossY + 60) {
+            presionoObjetivo = true;
+            misBalas.push({ x: jugadorX, y: jugadorY - 20, targetX: miniBossX, targetY: miniBossY + 30 });
+        }
     }
     
+    // RITMO
     if (modoActual === "ritmo") {
-        // FÍSICA DANCE OF FIRE AND ICE: El planeta que orbitaba se vuelve el centro estable
-        if (pivoteFuego) {
-            fuegoX = centroRotacionX();
-            fuegoY = centroRotacionY();
-            pivoteFuego = false;
-        } else {
-            hieloX = centroRotacionX();
-            hieloY = centroRotacionY();
-            pivoteFuego = true;
-        }
-        anguloPlaneta += Math.PI; // Invierte el cuadrante de rotación de forma matemática
+        let radioOrbita = 80;
+        if (pivoteFuego) { fuegoX = hieloX + Math.cos(anguloPlaneta)*radioOrbita; fuegoY = hieloY + Math.sin(anguloPlaneta)*radioOrbita; pivoteFuego = false; }
+        else { hieloX = fuegoX + Math.cos(anguloPlaneta)*radioOrbita; hieloY = fuegoY + Math.sin(anguloPlaneta)*radioOrbita; pivoteFuego = true; }
+        anguloPlaneta += Math.PI;
         puntosPartida += 5;
     }
 
+    // SHOOT THE BOX
     if (modoActual === "shoot") {
-        // Validación de hit dentro del perímetro real de la caja rebotadora
-        if (e.clientX >= cajaShoot.x && e.clientX <= cajaShoot.x + cajaShoot.tamaño &&
-            e.clientY >= cajaShoot.y && e.clientY <= cajaShoot.y + cajaShoot.tamaño) {
+        if (e.clientX >= cajaShoot.x && e.clientX <= cajaShoot.x + cajaShoot.tamaño && e.clientY >= cajaShoot.y && e.clientY <= cajaShoot.y + cajaShoot.tamaño) {
             puntosPartida += 10;
             reajustarCajaShoot();
         }
     }
 });
 
-// Arrastre suave del dedo
+// Movimiento por arrastre controlado (Sujeto a límites de las líneas en modo Sans)
 window.addEventListener('pointermove', (e) => {
-    if ((modoActual === "original" || modoActual === "jefe_secreto") && !juegoPausado) {
+    if (juegoPausado || modoActual === "menu" || textoRefusedContador > 0) return;
+
+    if (modoActual === "original") {
         jugadorX = Math.max(30, Math.min(canvas.width - 30, e.clientX));
+    }
+    
+    if (modoActual === "jefe_secreto") {
+        // MOVIMIENTO LIBRE 4 DIRECCIONES BLOQUEADO DENTRO DEL CUADRO SANS
+        jugadorX = Math.max(cuadroSans.x + 15, Math.min(cuadroSans.x + cuadroSans.w - 15, e.clientX));
+        jugadorY = Math.max(cuadroSans.y + 15, Math.min(cuadroSans.y + cuadroSans.h - 15, e.clientY));
     }
 });
 
-function centroRotacionX() { return pivoteFuego ? fuegoX : hieloX; }
-function centroRotacionY() { return pivoteFuego ? fuegoY : hieloY; }
-
-function reajustarCajaShoot() {
-    cajaShoot.x = 60 + Math.random() * (canvas.width - 150);
-    cajaShoot.y = 80 + Math.random() * 150;
-    cajaShoot.vx = (Math.random() > 0.5 ? 1 : -1) * (4 + Math.random() * 4);
-    cajaShoot.vy = -3 - Math.random() * 3; // Impulso inicial hacia arriba
+// --- ACTIVACIÓN DEL PODER ILIMITADO MORADO ---
+function detonarIlimitadoPurpura() {
+    if (energiaMaldita >= 100 && purpuraActivoContador === 0) {
+        energiaMaldita = 0;
+        purpuraActivoContador = 180; // Dura 3 segundos a 60fps
+        document.getElementById("btn-purpura").style.display = "none";
+    }
 }
 
-// --- BUCLE CENTRAL DEL MOTOR ---
+function crearChispas(x, y) {
+    for(let i=0; i<8; i++) {
+        particulasChispas.push({ x: x, y: y, vx: (Math.random()-0.5)*6, vy: (Math.random()-0.5)*6, alpha: 1 });
+    }
+}
+
+function reajustarCajaShoot() {
+    cajaShoot.x = 50 + Math.random() * (canvas.width - 120);
+    cajaShoot.y = 100;
+    cajaShoot.vx = (Math.random() > 0.5 ? 2 : -2) * (3 + Math.random()*3);
+    cajaShoot.vy = -4;
+}
+
+// --- BUCLE PRINCIPAL ---
 function buclePrincipal() {
-    // Fondo espacial
-    ctx.fillStyle = "#030308";
+    ctx.fillStyle = "#020204";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.fillStyle = "rgba(255,255,255,0.3)";
+
+    // Render de estrellas fijas de fondo
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
     estrellasFondo.forEach(st => { ctx.fillRect(st.x, st.y, st.s, st.s); });
 
+    // Actualizar partículas de chispas
+    ctx.fillStyle = "#ffaa00";
+    for (let i = particulasChispas.length - 1; i >= 0; i--) {
+        let p = particulasChispas[i];
+        p.x += p.vx; p.y += p.vy; p.alpha -= 0.04;
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.fillRect(p.x, p.y, 3, 3);
+        if(p.alpha <= 0) particulasChispas.splice(i, 1);
+    }
+    ctx.globalAlpha = 1.0;
+
     if (modoActual !== "menu" && !juegoPausado) {
-        if(modoActual === "original" || modoActual === "jefe_secreto") {
-            document.getElementById("txt-hud-stats").innerText = `PUNTOS: ${puntosPartida} | ENERGÍA MALDITA: ${Math.floor(energiaMaldita)}/100`;
+        if(modoActual === "original") {
+            document.getElementById("txt-hud-stats").innerText = `VIDAS: ${jugadorHP} | PUNTOS: ${puntosPartida} | ENERGÍA: ${Math.floor(energiaMaldita)}%`;
+            if (energiaMaldita >= 100 && purpuraActivoContador === 0) document.getElementById("btn-purpura").style.display = "flex";
+            actualizarModoOriginal();
+        } else if (modoActual === "jefe_secreto") {
+            document.getElementById("txt-hud-stats").innerText = `FASE SANS: ${faseJefeSecreto}/10 | TU HP: ${jugadorHP}`;
+            actualizarModoSans();
         } else {
             document.getElementById("txt-hud-stats").innerText = `MODO: ${modoActual.toUpperCase()} | PUNTOS: ${puntosPartida}`;
+            if (modoActual === "ritmo") actualizarModoRitmo();
+            if (modoActual === "shoot") actualizarModoShoot();
         }
 
-        if (modoActual === "original") actualizarModoOriginal();
-        if (modoActual === "jefe_secreto") actualizarModoJefeSecreto();
-        if (modoActual === "ritmo") actualizarModoRitmo();
-        if (modoActual === "shoot") actualizarModoShoot();
+        // Condición de Muerte Unificada
+        if (jugadorHP <= 0) {
+            alert(`FIN DEL JUEGO. Sumaste +${puntosPartida} puntos.`);
+            volverAlMenuPrincipal();
+        }
     }
 
-    if (modoActual !== "menu") {
-        if (modoActual !== "ritmo") dibujarPersonajeSkin(jugadorX, jugadorY);
+    if (modoActual !== "menu" && modoActual !== "ritmo") {
+        dibujarPersonajeSkin(jugadorX, jugadorY);
     }
 
     requestAnimationFrame(buclePrincipal);
 }
 
-// --- MODO ORIGINAL ACTUALIZADO ---
+// --- MODO 1: ARENA ORIGINAL ---
 function actualizarModoOriginal() {
-    // Generación aleatoria de amenazas
-    if (Math.random() < 0.02) objetivosOriginales.push({ x: Math.random() * (canvas.width - 40), y: -20, h: 25 });
-    if (Math.random() < 0.05) balasCaendo.push({ x: Math.random() * canvas.width, y: -10, vy: 5 });
+    if (Math.random() < 0.02) objetivosOriginales.push({ x: Math.random() * (canvas.width - 40), y: -30 });
+    if (Math.random() < 0.04) balasCaendo.push({ x: Math.random() * canvas.width, y: -10, vy: 4.5 });
 
-    // Evaluación del Mini Boss (Cada 10 segundos, probabilidad de 1 en 5)
     if (Date.now() - tiempoUltimoBossCheck > 10000 && !miniBossActivo) {
         tiempoUltimoBossCheck = Date.now();
-        if (Math.random() < 0.20) { 
-            miniBossActivo = true;
-            miniBossHP = 20;
-            miniBossX = canvas.width / 2;
-            miniBossY = 100;
+        if (Math.random() < 0.20) { miniBossActivo = true; miniBossHP = 20; miniBossX = canvas.width/2; miniBossY = 90; }
+    }
+
+    // Dibujar objetivos normales
+    ctx.fillStyle = "#ffcc00";
+    objetivosOriginales.forEach((obj, idx) => {
+        obj.y += 2;
+        ctx.fillRect(obj.x, obj.y, 35, 35);
+        // Si el bloque objetivo toca el suelo, se pierde
+        if (obj.y > canvas.height) objetivosOriginales.splice(idx, 1);
+    });
+
+    // Balas enemigas cayendo
+    ctx.fillStyle = "#00d2ff";
+    balasCaendo.forEach((bc, idx) => {
+        bc.y += bc.vy;
+        ctx.fillRect(bc.x, bc.y, 4, 15);
+
+        // Impacto directo al Hechicero
+        if (bc.y > jugadorY - 20 && bc.y < jugadorY + 20 && bc.x > jugadorX - 25 && bc.x < jugadorX + 25) {
+            balasCaendo.splice(idx, 1);
+            jugadorHP--;
+        }
+        if (bc.y > canvas.height) balasCaendo.splice(idx, 1);
+    });
+
+    // Habilidad del Púrpura destructor masivo
+    if (purpuraActivoContador > 0) {
+        purpuraActivoContador--;
+        ctx.fillStyle = "rgba(163, 51, 255, 0.85)";
+        ctx.fillRect(jugadorX - 45, 0, 90, canvas.height); // Borrado lineal vertical masivo
+        
+        // Destruye todo a su paso
+        objetivosOriginales = [];
+        balasCaendo = [];
+        if (miniBossActivo) {
+            miniBossHP -= 0.5;
+            if(miniBossHP <= 0) { miniBossActivo = false; iniciarTransicionSans(); }
         }
     }
 
-    // Dibujar objetivos
-    ctx.fillStyle = "#ff2255";
-    objetivosOriginales.forEach((obj, i) => {
-        obj.y += 2.5;
-        ctx.fillRect(obj.x, obj.y, 30, 30);
-        if (obj.y > canvas.height) objetivosOriginales.splice(i, 1);
-    });
-
-    // Dibujar líneas/balas enemigas verticales cayendo (Como el juego viejo)
-    ctx.fillStyle = "#00d2ff";
-    balasCaendo.forEach((bc, i) => {
-        bc.y += bc.vy;
-        ctx.fillRect(bc.x, bc.y, 3, 16);
-        if (bc.y > canvas.height) balasCaendo.splice(i, 1);
-    });
-
-    // Control de proyectiles del Hechicero (Gato)
+    // Lógica física de nuestras balas disparadas a objetivos
     misBalas.forEach((mb, i) => {
-        mb.y -= 9;
+        let dx = mb.targetX - mb.x;
+        let dy = mb.targetY - mb.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
         
-        // Estilo visual del disparo morado original
+        if(dist > 5) {
+            mb.x += (dx / dist) * 10;
+            mb.y += (dy / dist) * 10;
+        } else {
+            misBalas.splice(i, 1);
+            return;
+        }
+
         ctx.fillStyle = "#a333ff";
         ctx.beginPath(); ctx.arc(mb.x, mb.y, 7, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath(); ctx.arc(mb.x, mb.y, 3, 0, Math.PI*2); ctx.fill();
 
-        if(mb.y < -20) misBalas.splice(i, 1);
-
-        // Impacto a objetivos comunes
-        objetivosOriginales.forEach((obj, oi) => {
-            if(mb.x >= obj.x && mb.x <= obj.x+30 && mb.y >= obj.y && mb.y <= obj.y+30) {
-                objetivosOriginales.splice(oi, 1);
+        // CHOQUE FÍSICO CONTRA BALAS ENEMIGAS (CHISPAS)
+        balasCaendo.forEach((bc, bIdx) => {
+            if (Math.abs(mb.x - bc.x) < 12 && Math.abs(mb.y - bc.y) < 12) {
+                crearChispas(mb.x, mb.y);
+                balasCaendo.splice(bIdx, 1);
                 misBalas.splice(i, 1);
-                puntosPartida += 10;
-                if(energiaMaldita < 100) energiaMaldita += 8;
             }
         });
-
-        // Impacto al Mini Boss
-        if (miniBossActivo && mb.x >= miniBossX - 25 && mb.x <= miniBossX + 25 && mb.y >= miniBossY && mb.y <= miniBossY + 40) {
-            misBalas.splice(i, 1);
-            miniBossHP--;
-            if (miniBossHP <= 0) {
-                miniBossActivo = false;
-                animacionSecretaContador = 90; // Activa disparo de flashes
-                modoActual = "jefe_secreto";
-            }
-        }
     });
 
     if (miniBossActivo) {
         miniBossX += miniBossVX;
-        if(miniBossX < 30 || miniBossX > canvas.width - 30) miniBossVX *= -1;
-        
-        ctx.fillStyle = "#ffcc00";
-        ctx.fillRect(miniBossX - 25, miniBossY, 50, 35);
-        
+        if(miniBossX < 50 || miniBossX > canvas.width - 50) miniBossVX *= -1;
+        ctx.fillStyle = "#e60067";
+        ctx.fillRect(miniBossX - 40, miniBossY, 80, 50); // Cubo gigante
         ctx.fillStyle = "white";
-        ctx.font = "bold 11px sans-serif";
-        ctx.fillText(`MINI BOSS: ${miniBossHP} HP`, miniBossX - 30, miniBossY - 10);
+        ctx.font = "bold 12px sans-serif";
+        ctx.fillText(`MINI BOSS: ${Math.floor(miniBossHP)} HP`, miniBossX - 35, miniBossY - 10);
     }
 }
 
-// --- ANIMACIÓN SECRETA Y JEFE SUKUNA (IGUAL AL VIEJO) ---
-function actualizarModoJefeSecreto() {
-    if (animacionSecretaContador > 0) {
-        animacionSecretaContador--;
-        // EFECTO VISUAL: Inversión de flashes estroboscópicos psicodélicos del juego original
-        ctx.fillStyle = animacionSecretaContador % 4 === 0 ? "rgba(255,255,255,0.8)" : "rgba(144,0,199,0.7)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+function iniciarTransicionSans() {
+    modoActual = "jefe_secreto";
+    faseJefeSecreto = 1;
+    jugadorHP = 10;
+    cuadroSans.x = canvas.width/2 - 130;
+    cuadroSans.y = canvas.height/2 - 60;
+    jugadorX = canvas.width/2;
+    jugadorY = canvas.height/2 + 40;
+    generarAtaquesFaseSans();
+}
+
+// --- MODO 2: JEFE SECRETO ESTILO SANS TRADUCIDO ---
+function actualizarModoSans() {
+    // Escena Intermedia "But it Refused"
+    if (textoRefusedContador > 0) {
+        textoRefusedContador--;
         ctx.fillStyle = "black";
-        ctx.font = "bold 22px sans-serif";
-        ctx.fillText("¡PORTAL ABRIÉNDOSE!", canvas.width/2 - 120, canvas.height/2);
-        
-        if(animacionSecretaContador === 0) {
-            faseJefeSecreto = true;
-            jefeSecretoHP = 100;
-            balasCaendo = [];
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ff0044";
+        ctx.font = "bold 26px Courier New";
+        ctx.fillText("But it refused...", canvas.width/2 - 110, canvas.height/2);
+        if(textoRefusedContador === 0) {
+            faseJefeSecreto = 10;
+            temporizadorAtaqueFase = 0;
+            generarAtaquesFaseSans();
         }
         return;
     }
 
-    // Interfaz de Sukuna Arena
-    ctx.strokeStyle = "#ff0044";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(20, 150, canvas.width - 40, canvas.height - 300);
+    // Dibujar caja límite obligatoria de Sans
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(cuadroSans.x, cuadroSans.y, cuadroSans.w, cuadroSans.h);
 
-    // Dibujar Jefe Sukuna (Un cubo con ojos malvados del viejo motor)
-    ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(canvas.width / 2 - 40, 60, 80, 60);
-    ctx.strokeStyle = "#ff0000";
-    ctx.strokeRect(canvas.width / 2 - 40, 60, 80, 60);
+    // Dibujar al Oponente Sans (Caja con aura de fuego)
+    ctx.fillStyle = "#111";
+    ctx.fillRect(canvas.width/2 - 30, cuadroSans.y - 70, 60, 50);
+    ctx.strokeStyle = "#a333ff";
+    ctx.strokeRect(canvas.width/2 - 30, cuadroSans.y - 70, 60, 50);
 
-    // Ojos rojos de Sukuna
-    ctx.fillStyle = "red";
-    ctx.fillRect(canvas.width / 2 - 25, 80, 10, 6);
-    ctx.fillRect(canvas.width / 2 + 15, 80, 10, 6);
-
-    // HUD del Jefe
-    ctx.fillStyle = "white";
-    ctx.font = "12px sans-serif";
-    ctx.fillText(`SUKUNA HP: ${jefeSecretoHP}/100`, canvas.width/2 - 45, 45);
-
-    // Ataque de cortes
-    if(Math.random() < 0.07) {
-        balasCaendo.push({ x: Math.random() * canvas.width, y: 120, vy: 6 });
+    // Sistema de Temporizadores de la fase activa
+    temporizadorAtaqueFase++;
+    if (temporizadorAtaqueFase > 300) { // Cada fase dura 5 segundos
+        temporizadorAtaqueFase = 0;
+        faseJefeSecreto++;
+        if (faseJefeSecreto === 10) {
+            textoRefusedContador = 150; // Detona animación de muerte y renacimiento
+        } else if (faseJefeSecreto > 10) {
+            puntosPartida += 2000;
+            alert("¡FELICIDADES! DESTROZASTE AL JEFE SECRETO.");
+            volverAlMenuPrincipal();
+        } else {
+            generarAtaquesFaseSans();
+        }
     }
 
-    balasCaendo.forEach((bc, idx) => {
-        bc.y += bc.vy;
-        ctx.fillStyle = "#ff0044";
-        ctx.fillRect(bc.x, bc.y, 2, 20); // Cortes lineales rojos
-        if(bc.y > canvas.height) balasCaendo.splice(idx, 1);
-    });
+    // Renderizar ataques de la fase (Puestas aleatorias sin patrón repetible)
+    listaAtaquesFase.forEach(atk => {
+        if (atk.tipo === "hueso") {
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(atk.x, atk.y, atk.w, atk.h);
+            // Colisión por hitbox estricta
+            if (jugadorX > atk.x && jugadorX < atk.x + atk.w && jugadorY > atk.y && jugadorY < atk.y + atk.h) {
+                jugadorHP--;
+            }
+        }
+        
+        if (atk.tipo === "blaster_triangulo") {
+            atk.timer++;
+            // Dibujar Blaster Triangular
+            ctx.strokeStyle = "#00ffcc";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(atk.x, atk.y - 15);
+            ctx.lineTo(atk.x - 15, atk.y + 15);
+            ctx.lineTo(atk.x + 15, atk.y + 15);
+            ctx.closePath();
+            ctx.stroke();
 
-    // Validar disparos al jefe
-    misBalas.forEach((mb, i) => {
-        mb.y -= 9;
-        ctx.fillStyle = "#ffff00";
-        ctx.fillRect(mb.x - 2, mb.y, 4, 12);
-
-        if (mb.y < 120 && mb.x >= canvas.width/2 - 40 && mb.x <= canvas.width/2 + 40) {
-            misBalas.splice(i, 1);
-            jefeSecretoHP -= 4;
-            if(jefeSecretoHP <= 0) {
-                puntosPartida += 1000;
-                volverAlMenuPrincipal();
+            // Disparo del rayo láser continuo al pasar 1.5 segundos
+            if (atk.timer > 45) {
+                ctx.fillStyle = "rgba(0, 255, 200, 0.75)";
+                ctx.fillRect(atk.x - 6, atk.y + 15, 12, canvas.height);
+                
+                // Colisión con rayo láser triangular
+                if (Math.abs(jugadorX - atk.x) < 12 && jugadorY > atk.y + 15) {
+                    jugadorHP--;
+                }
             }
         }
     });
 }
 
-// --- MODO DANCE OF FIRE AND ICE ---
+// PRODUCCIÓN ALEATORIA DE 20 AMENAZAS SIN REPETIR PATRÓN
+function generarAtaquesFaseSans() {
+    listaAtaquesFase = [];
+    let cantidadAtaquesMax = 12 + faseJefeSecreto * 2; // Sube la densidad por fase
+
+    for (let i = 0; i < cantidadAtaquesMax; i++) {
+        let randTipo = Math.random() > 0.4 ? "hueso" : "blaster_triangulo";
+        
+        if (randTipo === "hueso") {
+            listaAtaquesFase.push({
+                tipo: "hueso",
+                x: cuadroSans.x + Math.random() * (cuadroSans.w - 20),
+                y: cuadroSans.y + Math.random() * (cuadroSans.h - 40),
+                w: 12, h: 45
+            });
+        } else {
+            listaAtaquesFase.push({
+                tipo: "blaster_triangulo",
+                x: cuadroSans.x + Math.random() * cuadroSans.w,
+                y: cuadroSans.y + 20,
+                timer: 0
+            });
+        }
+    }
+}
+
+// --- MODO 3: DANCE OF FIRE AND ICE ---
 function actualizarModoRitmo() {
     anguloPlaneta += velocidadAngular;
+    let radioOrbita = 80;
+    let ejeX = pivoteFuego ? fuegoX : hieloX;
+    let ejeY = pivoteFuego ? fuegoY : hieloY;
 
-    let radioOrbita = 85;
-    let ejeX = centroRotacionX();
-    let ejeY = centroRotacionY();
-
-    // El planeta libre calcula su posición física por trigonometría exacta en base al radio
     if (pivoteFuego) {
         hieloX = ejeX + Math.cos(anguloPlaneta) * radioOrbita;
         hieloY = ejeY + Math.sin(anguloPlaneta) * radioOrbita;
@@ -369,132 +457,94 @@ function actualizarModoRitmo() {
         fuegoY = ejeY + Math.sin(anguloPlaneta) * radioOrbita;
     }
 
-    // Dibujar línea de enlace rítmica
-    ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(fuegoX, fuegoY);
-    ctx.lineTo(hieloX, hieloY);
-    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.1)";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(fuegoX, fuegoY); ctx.lineTo(hieloX, hieloY); ctx.stroke();
 
-    // Renderizar Esfera Fire (Fuego - Roja)
-    ctx.shadowBlur = 15; ctx.shadowColor = "#ff3300";
-    ctx.fillStyle = "#ff4400";
-    ctx.beginPath(); ctx.arc(fuegoX, fuegoY, 24, 0, Math.PI*2); ctx.fill();
-
-    // Renderizar Esfera Ice (Hielo - Azul)
-    ctx.shadowColor = "#00ccff";
-    ctx.fillStyle = "#00eeff";
-    ctx.beginPath(); ctx.arc(hieloX, hieloY, 24, 0, Math.PI*2); ctx.fill();
-    
-    // Limpiar sombreado para no alentar el canvas
-    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#ff3300";
+    ctx.beginPath(); ctx.arc(fuegoX, fuegoY, 20, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#00bfff";
+    ctx.beginPath(); ctx.arc(hieloX, hieloY, 20, 0, Math.PI*2); ctx.fill();
 }
 
-// --- MODO SHOOT THE BOX CON GRAVEDAD ---
+// --- MODO 4: SHOOT THE BOX ---
 function actualizarModoShoot() {
-    // Aplicación de físicas reales (Velocidad y caída por gravedad)
     cajaShoot.vy += cajaShoot.gravedad;
     cajaShoot.x += cajaShoot.vx;
     cajaShoot.y += cajaShoot.vy;
 
-    // Rebotes contra bordes laterales del Canvas
-    if (cajaShoot.x <= 0 || cajaShoot.x + cajaShoot.tamaño >= canvas.width) {
-        cajaShoot.vx *= -1;
-    }
-    // Rebote inferior contra el suelo simulado
-    if (cajaShoot.y + cajaShoot.tamaño >= canvas.height - 40) {
-        cajaShoot.vy = -Math.abs(cajaShoot.vy) * 0.85; // Absorción elástica del rebote
+    if (cajaShoot.x <= 0 || cajaShoot.x + cajaShoot.tamaño >= canvas.width) cajaShoot.vx *= -1;
+    if (cajaShoot.y + cajaShoot.tamaño >= canvas.height - 30) {
+        cajaShoot.vy = -Math.abs(cajaShoot.vy) * 0.85;
     }
 
-    // Render de la caja naranja idéntica a tu video
-    ctx.fillStyle = "#ff9900";
+    ctx.fillStyle = "#ff6600";
     ctx.fillRect(cajaShoot.x, cajaShoot.y, cajaShoot.tamaño, cajaShoot.tamaño);
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "white";
     ctx.strokeRect(cajaShoot.x, cajaShoot.y, cajaShoot.tamaño, cajaShoot.tamaño);
 }
 
-// --- DIBUJO DE SKIN ORIGINAL (CÍRCULO CON OJOS BLANCOS) ---
+// --- PINTADO DEL GATO CON SUS COMPONENTES ---
 function dibujarPersonajeSkin(x, y) {
     let style = SKINS_HECHICEROS[skinEquipada] || SKINS_HECHICEROS["Gojo Satoru"];
 
-    // Aura exterior
-    ctx.beginPath();
-    ctx.arc(x, y, 40, 0, Math.PI * 2);
-    ctx.fillStyle = style.aura + "33";
-    ctx.fill();
+    // Aura mística expandida
+    ctx.fillStyle = style.aura + "22";
+    ctx.beginPath(); ctx.arc(x, y, 35, 0, Math.PI*2); ctx.fill();
 
-    // Cuerpo base circular
-    ctx.beginPath();
-    ctx.arc(x, y, 30, 0, Math.PI * 2);
+    // Cabeza del Gato
     ctx.fillStyle = style.cuerpo;
-    ctx.fill();
     ctx.strokeStyle = style.aura;
     ctx.lineWidth = 3;
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, 25, 0, Math.PI*2); ctx.fill(); ctx.stroke();
 
-    // Ojitos blancos del gato/hechicero original del video
+    // Orejas/Cuernos blancos del Gato
     ctx.fillStyle = "white";
     ctx.beginPath();
-    ctx.arc(x - 9, y - 4, 4, 0, Math.PI * 2);
-    ctx.arc(x + 9, y - 4, 4, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(x - 22, y - 12); ctx.lineTo(x - 12, y - 32); ctx.lineTo(x - 2, y - 20); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + 22, y - 12); ctx.lineTo(x + 12, y - 32); ctx.lineTo(x + 2, y - 20); ctx.fill();
+
+    // Ojos blancos rectos
+    ctx.fillStyle = "white";
+    ctx.fillRect(x - 11, y - 4, 6, 6);
+    ctx.fillRect(x + 5, y - 4, 6, 6);
 }
 
-// --- COMPONENTES DE INTERFAZ ---
 function renderTienda() {
-    let div = document.getElementById("contenedor-tienda");
-    if (!div) return;
+    let div = document.getElementById("contenedor-tienda"); if (!div) return;
     div.innerHTML = HABILIDADES.map((h, i) => `
         <div class="item-habilidad">
             <div style="text-align:left;">
                 <div style="font-weight:bold;">${h.nombre}</div>
-                <div style="font-size:11px; color:#ffcc00;">Costo: $${h.precio} PTS</div>
+                <div style="font-size:11px; color:#ffcc00;">$${h.precio} PTS</div>
             </div>
-            <button class="btn-comprar ${h.comprado ? 'adquirido' : ''}" onclick="comprarItem(${i})">
-                ${h.comprado ? 'ADQUIRIDO' : 'COMPRAR'}
-            </button>
+            <button class="btn-comprar ${h.comprado ? 'adquirido' : ''}" onclick="comprarItem(${i})">${h.comprado ? 'USANDO' : 'COMPRAR'}</button>
         </div>
     `).join('');
 }
 
 function comprarItem(i) {
     let h = HABILIDADES[i];
-    if (!h.comprado && puntosAcumulados >= h.precio) {
-        puntosAcumulados -= h.precio;
-        h.comprado = true;
-        document.getElementById("txt-puntos").innerText = puntosAcumulados;
-        renderTienda();
-    }
+    if (!h.comprado && puntosAcumulados >= h.precio) { puntosAcumulados -= h.precio; h.comprado = true; document.getElementById("txt-puntos").innerText = puntosAcumulados; renderTienda(); }
 }
 
 function renderSkins() {
-    let div = document.getElementById("contenedor-hechiceros");
-    if (!div) return;
+    let div = document.getElementById("contenedor-hechiceros"); if (!div) return;
     div.innerHTML = Object.keys(SKINS_HECHICEROS).map(name => `
-        <div class="item-habilidad" style="cursor:pointer;" onclick="equiparSkin('${name}')">
+        <div class="item-habilidad" onclick="equiparSkin('${name}')">
             <div style="text-align:left; font-weight:bold; color:${skinEquipada === name ? '#00ff66' : '#fff'}">${name}</div>
-            ${skinEquipada === name ? '<span style="color:#00ff66; font-size:12px; font-weight:bold;">USANDO</span>' : '<button class="btn-comprar" style="background:#333; color:white;">USAR</button>'}
+            ${skinEquipada === name ? '<span style="color:#00ff66; font-size:11px; font-weight:bold;">PUESTA</span>' : '<button class="btn-comprar" style="background:#222; color:white;">USAR</button>'}
         </div>
     `).join('');
 }
 
-function equiparSkin(name) {
-    skinEquipada = name;
-    renderSkins();
-}
+function equiparSkin(name) { skinEquipada = name; renderSkins(); }
 
 function encenderMusicaGD() {
     let audio = document.getElementById("musica-gd");
-    if (audio && !musicaSonando) {
-        audio.volume = 0.18;
-        audio.play().then(() => { musicaSonando = true; }).catch(() => {});
-    }
+    if (audio && !musicaSonando) { audio.volume = 0.15; audio.play().then(() => { musicaSonando = true; }).catch(() => {}); }
 }
 
-window.onload = () => {
-    redimensionar();
-    generarEstrellas();
-    buclePrincipal();
-};
+window.onload = () => { redimensionar(); generarEstrellas(); buclePrincipal(); };
+
