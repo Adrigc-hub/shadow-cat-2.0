@@ -1,21 +1,17 @@
-// --- CONFIGURACIÓN PRINCIPAL & LOCALSTORAGE ---
+// --- CONFIGURACIÓN PRINCIPAL ---
 let puntosAcumulados = 0;
 let modoActual = "carga";
 let juegoPausado = false;
 let skinEquipada = "Default Cat";
 let audioCtx = null;
 
-// Fórmulas matemáticas confusas reales para usar en la animación de renderizado del menú/gato
 const FORMULAS_MATH_CODE = [
-    "vec3 normal = cross(dFdx(v_pos), dFdy(v_pos));",
-    "float dt = sqrt(pow(dx, 2.0) + pow(dy, 2.0));",
-    "X_new = x * cos(θ) - y * sin(θ) + translation.x;",
-    "Y_new = x * sin(θ) + y * cos(θ) + translation.y;",
-    "hitbox.dist = abs(A*x + B*y + C) / sqrt(A*A + B*B);",
-    "velocity.y += gravity * delta_time * speedFactor;",
     "matrix_projection[0][0] = 2.0 * near / (right - left);",
-    "AudioContext.currentTime -> lerp(frequency, 600, 0.08);",
-    "localStorage.setItem('SHADOW_CAT_SAVE', total_pts);"
+    "X_new = x * cos(θ) - y * sin(θ) + translation.x;",
+    "hitbox.dist = abs(A*x + B*y + C) / sqrt(A*A + B*B);",
+    "velocity.y += gravity * delta_time;",
+    "void main() { gl_FragColor = vec4(0.0, 1.0, 0.8, 1.0); }",
+    "localStorage.setItem('SHADOW_CAT_SAVE_3', total_pts);"
 ];
 
 const SKINS_GATOS = {
@@ -26,15 +22,16 @@ const SKINS_GATOS = {
 
 // Atributos y Estado del Gato
 let jugadorX = 200, jugadorY = 400, jugadorHP = 10;
-let misBalas = [], objetivosOriginales = [], balasCaendo = [], particulasChispas = [];
+let misBalas = [], objetivosOriginales = [], balasCaendo = [], particulasFX = [];
 let estrellasFondo = [], energiaMaldita = 0, puntosPartida = 0;
 
-// Estado del Boss y Turnos de Combate
+// Estado del Boss y Turnos
 let purpuraActivoContador = 0;
 let miniBossActivo = false;
 let miniBossHP = 20;
-let miniBossX = 200, miniBossY = 90, miniBossVX = 3;
+let miniBossX = 200, miniBossY = 90, miniBossVX = 1.5; // FASE 1 MÁS FÁCIL (VELOCIDAD REDUCIDA)
 let tiempoInicioPartida = 0;
+let cutsceneGatoSecretaContador = 0; // Transición cinemática Gojo
 
 let faseJefeSecreto = 1;
 let jefeSecretoHP = 100;
@@ -61,9 +58,11 @@ let duracionSlowMo = 0;
 let factorMultiplicador = 1;
 let tiempoUltimaCajaShoot = 0;
 
-// Variables de la simulación de carga matemática
+// Variables de Pantalla de Carga y Animación de Rayo Matemático
 let progresoCargaPorcentaje = 0;
 let lineasMatematicasVisibles = [];
+let radioLaserDeCarga = 0;
+let laserDisparadoMatematico = false;
 
 const canvas = document.getElementById("canvasJuego");
 const ctx = canvas.getContext("2d");
@@ -81,26 +80,18 @@ function generarEstrellas() {
     }
 }
 
-// CARGAR ESTRATEGIA DE PROGRESO PERSISTENTE (LOCALSTORAGE)
 function cargarProgresoGuardado() {
     let datosGuardados = localStorage.getItem("SHADOW_CAT_SAVE_3");
     if (datosGuardados) {
         let json = JSON.parse(datosGuardados);
         puntosAcumulados = json.puntos || 0;
         skinEquipada = json.skin || "Default Cat";
-    } else {
-        puntosAcumulados = 0; 
-        skinEquipada = "Default Cat";
     }
     document.getElementById("txt-puntos").innerText = puntosAcumulados;
 }
 
 function guardarProgresoLocal() {
-    let jsonA_Guardar = {
-        puntos: puntosAcumulados,
-        skin: skinEquipada
-    };
-    localStorage.setItem("SHADOW_CAT_SAVE_3", JSON.stringify(jsonA_Guardar));
+    localStorage.setItem("SHADOW_CAT_SAVE_3", JSON.stringify({ puntos: puntosAcumulados, skin: skinEquipada }));
 }
 
 function inicializarAudioNativo() {
@@ -117,14 +108,13 @@ function sonarClickRitmo() {
     osc.start(); osc.stop(audioCtx.currentTime + 0.08);
 }
 
-// --- MANEJADOR DE PANTALLAS CORREGIDO ---
 function cambiarPantalla(destino) {
     document.getElementById("pantalla-menu").classList.remove("activa");
     document.getElementById("pantalla-hechiceros").classList.remove("activa");
     document.getElementById("hud-juego").style.display = "none";
     document.getElementById("btn-purpura").style.display = "none";
 
-    juegoPausado = false; miniBossActivo = false; textoRefusedContador = 0;
+    juegoPausado = false; miniBossActivo = false; textoRefusedContador = 0; cutsceneGatoSecretaContador = 0;
     energiaMaldita = 0; puntosPartida = 0; jugadorHP = 10; purpuraActivoContador = 0;
     faseJefeSecreto = 1; jefeSecretoHP = 100; turnoJugadorSans = false;
     duracionSlowMo = 0; factorMultiplicador = 1;
@@ -140,7 +130,7 @@ function cambiarPantalla(destino) {
         document.getElementById("hud-juego").style.display = "flex";
         jugadorX = canvas.width / 2;
         jugadorY = canvas.height - 130;
-        misBalas = []; objetivosOriginales = []; balasCaendo = []; particulasChispas = [];
+        misBalas = []; objetivosOriginales = []; balasCaendo = []; particulasFX = [];
         tiempoInicioPartida = Date.now();
 
         if (destino === 'juego-original') modoActual = "original";
@@ -161,15 +151,15 @@ function activarPausa(estado) {
 function volverAlMenuPrincipal() {
     puntosAcumulados += puntosPartida;
     document.getElementById("txt-puntos").innerText = puntosAcumulados;
-    guardarProgresoLocal(); // Guardado automático inmediato en la base del navegador
+    guardarProgresoLocal();
     activarPausa(false);
     cambiarPantalla('menu');
 }
 
-// --- SISTEMA DE COMBATE E INTERACCIONES TÁCTILES ---
+// --- CAPTURA DE TOUCH / CLICK EN PANTALLA ---
 window.addEventListener('pointerdown', (e) => {
     inicializarAudioNativo();
-    if (juegoPausado || modoActual === "menu" || modoActual === "carga" || textoRefusedContador > 0) return;
+    if (juegoPausado || modoActual === "menu" || modoActual === "carga" || textoRefusedContador > 0 || cutsceneGatoSecretaContador > 0) return;
 
     if (modoActual === "original") {
         let toqueX = e.clientX; let toqueY = e.clientY;
@@ -196,12 +186,9 @@ window.addEventListener('pointerdown', (e) => {
             let proximo = bloquesRitmo[indiceBloqueActual];
             if (pivoteFuego) { fuegoX = proximo.x; fuegoY = proximo.y; pivoteFuego = false; }
             else { hieloX = proximo.x; hieloY = proximo.y; pivoteFuego = true; }
-            
-            if (indiceBloqueActual >= bloquesRitmo.length - 1) {
-                alert("¡Felicidades, completaste el mapa rítmico!"); volverAlMenuPrincipal();
-            }
+            if (indiceBloqueActual >= bloquesRitmo.length - 1) { alert("¡Mapa rítmico completado!"); volverAlMenuPrincipal(); }
         } else {
-            alert("¡Fuera de ritmo o tocaste tarde! Fin del juego."); volverAlMenuPrincipal();
+            alert("¡Fuera de ritmo! Fin del juego."); volverAlMenuPrincipal();
         }
     }
 
@@ -216,18 +203,14 @@ window.addEventListener('pointerdown', (e) => {
 });
 
 window.addEventListener('pointermove', (e) => {
-    if (juegoPausado || modoActual === "menu" || modoActual === "carga" || textoRefusedContador > 0) return;
+    if (juegoPausado || modoActual === "menu" || modoActual === "carga" || textoRefusedContador > 0 || cutsceneGatoSecretaContador > 0) return;
 
     if (modoActual === "original") jugadorX = Math.max(30, Math.min(canvas.width - 30, e.clientX));
-
     if (modoActual === "jefe_secreto" && !turnoJugadorSans) {
         jugadorX = Math.max(cuadroSans.x + 15, Math.min(cuadroSans.x + cuadroSans.w - 15, e.clientX));
         jugadorY = Math.max(cuadroSans.y + 15, Math.min(cuadroSans.y + cuadroSans.h - 15, e.clientY));
     }
-
-    if (modoActual === "shoot" && cargandoTiroShoot) {
-        arrastreX = e.clientX; arrastreY = e.clientY;
-    }
+    if (modoActual === "shoot" && cargandoTiroShoot) { arrastreX = e.clientX; arrastreY = e.clientY; }
 });
 
 window.addEventListener('pointerup', (e) => {
@@ -245,9 +228,19 @@ function detonarIlimitadoPurpura() {
     }
 }
 
-function crearChispas(x, y) {
-    for(let i=0; i<8; i++) {
-        particulasChispas.push({ x: x, y: y, vx: (Math.random()-0.5)*7, vy: (Math.random()-0.5)*7, alpha: 1 });
+// --- MANEJADOR DE PARTÍCULAS EXCLUSIVAS POR SKIN ---
+function ejecutarImpactoEspecialFX(x, y) {
+    if (skinEquipada === "Default Cat") {
+        // Chispas explosivas tradicionales amarillas
+        for(let i=0; i<10; i++) {
+            particulasFX.push({ tipo: "chispa", x: x, y: y, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, alpha: 1, color: "#ffcc00" });
+        }
+    } else if (skinEquipada === "Gojo Satoru") {
+        // Agujero negro expansivo/colapsivo (Vacío infinito miniatura)
+        particulasFX.push({ tipo: "agujero_negro", x: x, y: y, radioMax: 30, radioActual: 2, expanding: true, timer: 40 });
+    } else if (skinEquipada === "Yuji Itadori") {
+        // Efecto de corte en cruz (Corte limpio a la mitad)
+        particulasFX.push({ tipo: "corte", x: x, y: y, longitudMax: 25, longitudActual: 0, timer: 20 });
     }
 }
 
@@ -273,11 +266,10 @@ function lanzarCajaShootPro() {
     });
 }
 
-// --- BUCLE PRINCIPAL DE RENDER ---
+// --- LOOP PRINCIPAL MOTOR DE GRÁFICOS ---
 function buclePrincipal() {
     ctx.fillStyle = "#020205"; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Si está en la pantalla de carga, procesa y dibuja las líneas de la matriz matemática
     if (modoActual === "carga") {
         ejecutarProcesamientoCargaMatricial();
         requestAnimationFrame(buclePrincipal);
@@ -287,14 +279,8 @@ function buclePrincipal() {
     ctx.fillStyle = "rgba(255,255,255,0.15)";
     estrellasFondo.forEach(st => { ctx.fillRect(st.x, st.y, 2, 2); });
 
-    // Render partículas
-    ctx.fillStyle = "#ffbb00";
-    for (let i = particulasChispas.length - 1; i >= 0; i--) {
-        let p = particulasChispas[i]; p.x += p.vx; p.y += p.vy; p.alpha -= 0.04;
-        ctx.globalAlpha = Math.max(0, p.alpha); ctx.fillRect(p.x, p.y, 3, 3);
-        if(p.alpha <= 0) particulasChispas.splice(i, 1);
-    }
-    ctx.globalAlpha = 1.0;
+    // PROCESAR EFECTOS VISUALES DINÁMICOS EN TIEMPO REAL
+    actualizarYRenderizarParticulasEspeciales();
 
     if (modoActual !== "menu" && !juegoPausado) {
         if (modoActual === "original") actualizarModoOriginal();
@@ -315,24 +301,19 @@ function buclePrincipal() {
     requestAnimationFrame(buclePrincipal);
 }
 
-// --- ANIMACIÓN DE PANTALLA DE CARGA MATEMÁTICA ---
+// --- ANIMACIÓN DE LA PANTALLA DE CARGA CON RAYO MATEMÁTICO EN LA GRÁFICA ---
 function ejecutarProcesamientoCargaMatricial() {
-    progresoCargaPorcentaje += 0.65; // Avanza de forma fluida
-    document.getElementById("barra-progreso-linea").style.width = `${Math.min(100, progresoCargaPorcentaje)}%`;
-
-    if (Math.random() < 0.15) {
-        let fRandom = FORMULAS_MATH_CODE[Math.floor(Math.random() * FORMULAS_MATH_CODE.length)];
-        document.getElementById("texto-matematico").innerText = fRandom;
-        
-        lineasMatematicasVisibles.push({
-            texto: fRandom,
-            x: Math.random() * (canvas.width - 200),
-            y: Math.random() * canvas.height,
-            life: 60
-        });
+    if (!laserDisparadoMatematico) {
+        progresoCargaPorcentaje += 0.8;
+        document.getElementById("barra-progreso-linea").style.width = `${Math.min(100, progresoCargaPorcentaje)}%`;
     }
 
-    // Dibujar códigos verdes matemáticos flotando en la matriz
+    if (Math.random() < 0.15 && !laserDisparadoMatematico) {
+        let fRandom = FORMULAS_MATH_CODE[Math.floor(Math.random() * FORMULAS_MATH_CODE.length)];
+        document.getElementById("texto-matematico").innerText = fRandom;
+        lineasMatematicasVisibles.push({ texto: fRandom, x: Math.random() * (canvas.width - 200), y: Math.random() * canvas.height, life: 60 });
+    }
+
     ctx.font = "11px Courier New";
     ctx.fillStyle = "rgba(0, 255, 170, 0.4)";
     lineasMatematicasVisibles.forEach((lin, idx) => {
@@ -341,34 +322,110 @@ function ejecutarProcesamientoCargaMatricial() {
         if (lin.life <= 0) lineasMatematicasVisibles.splice(idx, 1);
     });
 
-    // DIBUJAR AL GATO MEDIANTE VECTORES DE REJILLA EN LA CARGA
-    let cx = canvas.width / 2;
-    let cy = canvas.height / 2 - 80;
+    let cx = canvas.width / 2; let cy = canvas.height / 2 - 80;
     
-    ctx.strokeStyle = "rgba(144, 0, 199, 0.5)"; ctx.lineWidth = 1;
-    // Círculos de radio matemático simulando cálculo de hitboxes
-    ctx.beginPath(); ctx.arc(cx, cy, 35 + Math.sin(progresoCargaPorcentaje*0.1)*5, 0, Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy - 25, 20, 0, Math.PI*2); ctx.stroke();
-    // Líneas de vector a las orejas
-    ctx.strokeRect(cx - 20, cy - 45, 40, 40);
-    ctx.fillStyle = "#00ffcc";
-    ctx.fillText("VEC_HEAD: [x:0, y:-25, r:20]", cx + 45, cy - 25);
-    ctx.fillText("VEC_BODY: [x:0, y:0, r:35]", cx + 45, cy + 10);
+    // Dibujo preliminar del Gato con líneas de vector matemático
+    if (!laserDisparadoMatematico) {
+        ctx.strokeStyle = "rgba(144, 0, 199, 0.5)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(cx, cy, 35 + Math.sin(progresoCargaPorcentaje*0.1)*5, 0, Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy - 25, 20, 0, Math.PI*2); ctx.stroke();
+        ctx.strokeRect(cx - 20, cy - 45, 40, 40);
+        ctx.fillStyle = "#00ffcc";
+        ctx.fillText("MATRIX_VEC_HEAD: LOADED", cx + 45, cy - 25);
+    }
 
-    if (progresoCargaPorcentaje >= 100) {
-        document.getElementById("pantalla-carga").style.display = "none";
-        cargarProgresoGuardado(); // Recupera datos guardados al finalizar la carga
-        cambiarPantalla('menu');
+    // DISPARAR EL RAYO CUANDO LA BARRA LLEGA AL 100%
+    if (progresoCargaPorcentaje >= 100 && !laserDisparadoMatematico) {
+        laserDisparadoMatematico = true;
+        radioLaserDeCarga = 1;
+        document.getElementById("tit-compile").innerText = "LINKING INTERFACE...";
+    }
+
+    if (laserDisparadoMatematico) {
+        radioLaserDeCarga += 15; // Expansión del rayo matemático
+        
+        // El rayo cruzando de arriba hacia abajo dibujando todo el canvas
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, cy - 5, canvas.width, 10);
+        
+        ctx.fillStyle = "rgba(163, 51, 255, 0.3)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, radioLaserDeCarga, 0, Math.PI*2);
+        ctx.fill();
+
+        if (radioLaserDeCarga > canvas.width * 0.9) {
+            document.getElementById("pantalla-carga").style.display = "none";
+            cargarProgresoGuardado();
+            cambiarPantalla('menu');
+        }
     }
 }
 
-// --- ARENA ORIGINAL ---
-function actualizarModoOriginal() {
-    document.getElementById("txt-hud-stats").innerText = `VIDAS GATO: ${jugadorHP}/10 | PTS: ${puntosPartida} | PODER: ${Math.floor(energiaMaldita)}%`;
-    if (energiaMaldita >= 100 && purpuraActivoContador === 0) document.getElementById("btn-purpura").style.display = "flex";
+// --- RENDERIZADO DE LOS EFECTOS VISUALES EXCLUSIVOS DE SKIN ---
+function actualizarYRenderizarParticulasEspeciales() {
+    for (let i = particulasFX.length - 1; i >= 0; i--) {
+        let f = particulasFX[i];
+        
+        if (f.tipo === "chispa") {
+            f.x += f.vx; f.y += f.vy; f.alpha -= 0.04;
+            ctx.globalAlpha = Math.max(0, f.alpha);
+            ctx.fillStyle = f.color; ctx.fillRect(f.x, f.y, 3, 3);
+            if(f.alpha <= 0) particulasFX.splice(i, 1);
+        }
+        else if (f.tipo === "agujero_negro") {
+            f.timer--;
+            if (f.expanding) {
+                f.radioActual += 2.5;
+                if(f.radioActual >= f.radioMax) f.expanding = false;
+            } else {
+                f.radioActual -= 1.5;
+            }
+            
+            // Dibujar círculo concéntrico morado y azul (Efecto Vacío Infinito)
+            let grad = ctx.createRadialGradient(f.x, f.y, f.radioActual*0.1, f.x, f.y, f.radioActual);
+            grad.addColorStop(0, '#000000'); grad.addColorStop(0.5, '#4b0082'); grad.addColorStop(1, 'rgba(0, 210, 255, 0.0)');
+            ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(f.x, f.y, f.radioActual, 0, Math.PI*2); ctx.fill();
 
-    if (Math.random() < 0.02) objetivosOriginales.push({ x: Math.random() * (canvas.width - 40), y: -40 });
-    if (Math.random() < 0.04) balasCaendo.push({ x: Math.random() * canvas.width, y: -20, vy: 4 });
+            if (f.timer <= 0 || f.radioActual <= 1) particulasFX.splice(i, 1);
+        }
+        else if (f.tipo === "corte") {
+            f.timer--;
+            f.longitudActual += 2.5;
+            
+            // Líneas de corte diagonales cruzadas rojas (Divergent Fist/Cleave)
+            ctx.strokeStyle = "#ff1133"; ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(f.x - f.longitudActual, f.y - f.longitudActual);
+            ctx.lineTo(f.x + f.longitudActual, f.y + f.longitudActual);
+            ctx.moveTo(f.x + f.longitudActual, f.y - f.longitudActual);
+            ctx.lineTo(f.x - f.longitudActual, f.y + f.longitudActual);
+            ctx.stroke();
+
+            if (f.timer <= 0) particulasFX.splice(i, 1);
+        }
+    }
+    ctx.globalAlpha = 1.0;
+}
+
+// --- MODO ARENA ORIGINAL CORREGIDO ---
+function actualizarModoOriginal() {
+    // CINEMÁTICA SECRETA GOJO: PANTALLA DE TEXTO CONGELADA
+    if (cutsceneGatoSecretaContador > 0) {
+        cutsceneGatoSecretaContador--;
+        ctx.fillStyle = "rgba(10, 5, 28, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = "white"; ctx.font = "bold 28px sans-serif";
+        ctx.fillText("Mini Boss Defeated.", canvas.width/2 - 120, canvas.height/2 - 40);
+        ctx.fillStyle = "#00d2ff"; ctx.font = "italic bold 32px Courier New";
+        ctx.fillText('"Nah, I\'d win."', canvas.width/2 - 110, canvas.height/2 + 20);
+        
+        if (cutsceneGatoSecretaContador === 0) iniciarTransicionSans();
+        return;
+    }
+
+    // FASE 1 COMPLETAMENTE RE-CALIBRADA: VELOCIDAD Y BALAS MUY FÁCILES
+    if (Math.random() < 0.012) objetivosOriginales.push({ x: Math.random() * (canvas.width - 40), y: -40 });
+    if (Math.random() < 0.02) balasCaendo.push({ x: Math.random() * canvas.width, y: -20, vy: 2.2 }); // Balas enemigas más lentas
 
     if (Date.now() - tiempoInicioPartida > 10000 && !miniBossActivo && faseJefeSecreto === 1) {
         miniBossActivo = true; miniBossHP = 20; miniBossX = canvas.width / 2;
@@ -376,7 +433,7 @@ function actualizarModoOriginal() {
 
     ctx.fillStyle = "#ffcc00";
     objetivosOriginales.forEach((obj, idx) => {
-        obj.y += 2; ctx.fillRect(obj.x, obj.y, 35, 35);
+        obj.y += 1.5; ctx.fillRect(obj.x, obj.y, 35, 35);
         if (obj.y > canvas.height) objetivosOriginales.splice(idx, 1);
     });
 
@@ -396,7 +453,7 @@ function actualizarModoOriginal() {
         objetivosOriginales = []; balasCaendo = [];
         if (miniBossActivo) {
             miniBossHP -= 0.5;
-            if(miniBossHP <= 0) { miniBossActivo = false; iniciarTransicionSans(); }
+            if (miniBossHP <= 0) verificarDerrotaBossOriginal();
         }
     }
 
@@ -408,23 +465,18 @@ function actualizarModoOriginal() {
         if (dist > 6) {
             mb.x += (dx / dist) * 12; mb.y += (dy / dist) * 12;
             ctx.fillStyle = "#a333ff"; ctx.beginPath(); ctx.arc(mb.x, mb.y, 6, 0, Math.PI*2); ctx.fill();
-
-            balasCaendo.forEach((bc, bIdx) => {
-                if (Math.abs(mb.x - bc.x) < 14 && Math.abs(mb.y - bc.y) < 14) {
-                    crearChispas(mb.x, mb.y); balasCaendo.splice(bIdx, 1); misBalas.splice(i, 1);
-                }
-            });
         } else {
             if (mb.tipo === "normal") {
                 objetivosOriginales.forEach((obj, oIdx) => {
                     if (Math.abs(mb.x - (obj.x + 15)) < 30 && Math.abs(mb.y - (obj.y + 15)) < 30) {
+                        ejecutarImpactoEspecialFX(obj.x + 15, obj.y + 15); // Dispara efecto exclusivo
                         objetivosOriginales.splice(oIdx, 1); puntosPartida += 10;
                         if(energiaMaldita < 100) energiaMaldita += 8;
                     }
                 });
             } else if (mb.tipo === "boss" && miniBossActivo) {
                 miniBossHP--;
-                if (miniBossHP <= 0) { miniBossActivo = false; iniciarTransicionSans(); }
+                if (miniBossHP <= 0) verificarDerrotaBossOriginal();
             }
             misBalas.splice(i, 1);
         }
@@ -439,6 +491,15 @@ function actualizarModoOriginal() {
     }
 }
 
+function verificarDerrotaBossOriginal() {
+    miniBossActivo = false;
+    if (skinEquipada === "Gojo Satoru") {
+        cutsceneGatoSecretaContador = 180; // Activa escena de Gojo por 3 segundos
+    } else {
+        iniciarTransicionSans();
+    }
+}
+
 function iniciarTransicionSans() {
     modoActual = "jefe_secreto"; faseJefeSecreto = 1; jefeSecretoHP = 100; jugadorHP = 10;
     cuadroSans.x = canvas.width/2 - 130; cuadroSans.y = canvas.height/2 - 60;
@@ -449,8 +510,6 @@ function iniciarTransicionSans() {
 
 // --- SANS BOSSFIGHT ---
 function actualizarModoSans() {
-    document.getElementById("txt-hud-stats").innerText = `SANS FASE: ${faseJefeSecreto}/10 | HP JEFE: ${jefeSecretoHP} | TU HP: ${jugadorHP} | ${turnoJugadorSans ? "¡TOCÁ AL JEFE!" : "¡ESQUIVÁ!"}`;
-
     if (textoRefusedContador > 0) {
         textoRefusedContador--;
         ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -469,14 +528,12 @@ function actualizarModoSans() {
     ctx.fillStyle = "white"; ctx.font = "10px sans-serif"; ctx.fillText(`SANS HP: ${jefeSecretoHP}`, sx - 30, sy - 32);
 
     if (!turnoJugadorSans) {
-        ctx.strokeStyle = "white"; ctx.lineWidth = 4;
-        ctx.strokeRect(cuadroSans.x, cuadroSans.y, cuadroSans.w, cuadroSans.h);
+        ctx.strokeStyle = "white"; ctx.lineWidth = 4; ctx.strokeRect(cuadroSans.x, cuadroSans.y, cuadroSans.w, cuadroSans.h);
     }
 
     temporizadorFaseSans++;
     if (temporizadorFaseSans > 300) {
-        temporizadorFaseSans = 0;
-        turnoJugadorSans = !turnoJugadorSans;
+        temporizadorFaseSans = 0; turnoJugadorSans = !turnoJugadorSans;
         if (!turnoJugadorSans) {
             faseJefeSecreto++;
             if (faseJefeSecreto === 10 && jefeSecretoHP > 0) textoRefusedContador = 150;
@@ -518,7 +575,7 @@ function actualizarModoSans() {
             mb.x += (dx / d) * 14; mb.y += (dy / d) * 14;
             ctx.fillStyle = "#00ff00"; ctx.beginPath(); ctx.arc(mb.x, mb.y, 6, 0, Math.PI*2); ctx.fill();
         } else {
-            jefeSecretoHP -= 5; crearChispas(mb.x, mb.y); misBalas.splice(i, 1);
+            jefeSecretoHP -= 5; ejecutarImpactoEspecialFX(mb.x, mb.y); misBalas.splice(i, 1);
         }
     }
 }
@@ -537,8 +594,6 @@ function generarAtaquesDiagonalesSans() {
 
 // --- DANCE OF FIRE AND ICE ---
 function actualizarModoRitmo() {
-    document.getElementById("txt-hud-stats").innerText = `RITMO BLOQUE: ${indiceBloqueActual + 1}/30 | PUNTOS: ${puntosPartida}`;
-
     anguloPlaneta += 0.055; let radioOrbita = 70;
     let anguloReducido = anguloPlaneta % Math.PI;
     toleranciaRitmoAcertado = (anguloReducido < 0.2 || anguloReducido > Math.PI - 0.2);
@@ -570,8 +625,6 @@ function actualizarModoRitmo() {
 
 // --- SHOOT THE BOX ---
 function actualizarModoShoot() {
-    document.getElementById("txt-hud-stats").innerText = `MULTIPLICADOR: x${factorMultiplicador} | PUNTOS: ${puntosPartida} ${duracionSlowMo > 0 ? '[LENTO]' : ''}`;
-
     if (duracionSlowMo > 0) duracionSlowMo--;
     if (Date.now() - tiempoUltimaCajaShoot > 1100) { tiempoUltimaCajaShoot = Date.now(); lanzarCajaShootPro(); }
 
@@ -604,7 +657,7 @@ function actualizarModoShoot() {
 
             listaCajasShoot.forEach((caja, cIdx) => {
                 if (mb.x > caja.x && mb.x < caja.x + caja.w && mb.y > caja.y && mb.y < caja.y + caja.h) {
-                    crearChispas(caja.x + 20, caja.y + 20);
+                    ejecutarImpactoEspecialFX(caja.x + 20, caja.y + 20); // Animación customizada
                     if (caja.tipo === "trampa") puntosPartida = Math.max(0, puntosPartida - 15);
                     else if (caja.tipo === "slow") duracionSlowMo = 180;
                     else if (caja.tipo === "mult") { factorMultiplicador = 2; setTimeout(() => { factorMultiplicador = 1; }, 5000); }
@@ -618,28 +671,19 @@ function actualizarModoShoot() {
     }
 }
 
-// --- RENDERING DEL GATO REAL ---
+// --- RENDER COMPLETO DEL GATO REAL ---
 function dibujarGatoReal(x, y) {
     let s = SKINS_GATOS[skinEquipada] || SKINS_GATOS["Default Cat"];
     ctx.fillStyle = s.aura; ctx.beginPath(); ctx.arc(x, y - 10, 40, 0, Math.PI*2); ctx.fill();
 
-    // Cola
     ctx.strokeStyle = s.principal; ctx.lineWidth = 6; ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(x - 15, y + 25); ctx.quadraticCurveTo(x - 30, y + 10, x - 25, y - 5); ctx.stroke();
 
-    // Patas
     ctx.fillStyle = s.pecho; ctx.fillRect(x - 14, y + 22, 8, 10); ctx.fillRect(x + 6, y + 22, 8, 10);
-
-    // Cuerpo
     ctx.fillStyle = s.principal; ctx.beginPath(); ctx.ellipse(x, y + 10, 18, 22, 0, 0, Math.PI*2); ctx.fill();
-
-    // Pecho Blanco
     ctx.fillStyle = s.pecho; ctx.beginPath(); ctx.ellipse(x, y + 8, 10, 14, 0, 0, Math.PI*2); ctx.fill();
-
-    // Cabeza
     ctx.fillStyle = s.principal; ctx.beginPath(); ctx.arc(x, y - 15, 16, 0, Math.PI*2); ctx.fill();
 
-    // Orejas
     ctx.fillStyle = s.principal;
     ctx.beginPath(); ctx.moveTo(x - 15, y - 22); ctx.lineTo(x - 16, y - 36); ctx.lineTo(x - 4, y - 26); ctx.fill();
     ctx.beginPath(); ctx.moveTo(x + 15, y - 22); ctx.lineTo(x + 16, y - 36); ctx.lineTo(x + 4, y - 26); ctx.fill();
@@ -647,10 +691,7 @@ function dibujarGatoReal(x, y) {
     ctx.beginPath(); ctx.moveTo(x - 13, y - 24); ctx.lineTo(x - 14, y - 32); ctx.lineTo(x - 6, y - 26); ctx.fill();
     ctx.beginPath(); ctx.moveTo(x + 13, y - 24); ctx.lineTo(x + 14, y - 32); ctx.lineTo(x + 6, y - 26); ctx.fill();
 
-    // Ojos
     ctx.fillStyle = s.ojos; ctx.fillRect(x - 8, y - 19, 4, 6); ctx.fillRect(x + 4, y - 19, 4, 6);
-
-    // Bigotes
     ctx.fillStyle = "#ffb6c1"; ctx.fillRect(x - 1, y - 13, 2, 2);
     ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x - 6, y - 12); ctx.lineTo(x - 16, y - 14); ctx.moveTo(x - 6, y - 11); ctx.lineTo(x - 15, y - 10);
@@ -668,9 +709,8 @@ function renderSkins() {
 }
 
 function equiparSkin(name) {
-    skinEquipada = name;
-    guardarProgresoLocal(); // Guarda el cambio de skin persistentemente
-    renderSkins();
+    skinEquipada = name; guardarProgresoLocal(); renderSkins();
 }
 
 window.onload = () => { redimensionar(); generarEstrellas(); buclePrincipal(); };
+
