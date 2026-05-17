@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SHADOW CAT: PERSISTENT MATRIX</title>
+    <title>SHADOW CAT: COLD COMPILATION</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -12,7 +12,6 @@
             overflow: hidden; user-select: none; -webkit-user-select: none;
             touch-action: none;
         }
-        /* Pantalla de Carga Matemática */
         #pantalla-carga {
             position: absolute; width: 100%; height: 100%;
             background: #010103; display: flex; flex-direction: column;
@@ -25,7 +24,7 @@
         }
         #barra-progreso-linea {
             width: 0%; height: 100%; background: #9000c7;
-            box-shadow: 0 0 10px #a333ff; transition: width 0.1s linear;
+            box-shadow: 0 0 10px #a333ff;
         }
         #texto-matematico {
             font-family: 'Courier New', Courier, monospace; font-size: 11px;
@@ -37,8 +36,9 @@
             display: none; flex-direction: column;
             align-items: center; justify-content: center;
             box-sizing: border-box; padding: 20px; z-index: 5;
+            opacity: 0; transition: opacity 0.4s ease;
         }
-        .activa { display: flex; }
+        .activa { display: flex; opacity: 1; }
         
         .titulo-principal { font-size: 26px; letter-spacing: 2px; margin-bottom: 5px; text-align: center; font-weight: bold; color: #fff; text-shadow: 0 0 12px #9000c7; }
         .subtitulo { font-size: 11px; color: #a333ff; margin-bottom: 25px; text-transform: uppercase; font-weight: bold; }
@@ -111,11 +111,11 @@
     </audio>
 
     <div id="pantalla-carga">
-        <div style="font-weight: bold; font-size: 14px; letter-spacing: 3px; color: #a333ff;">COMPILING SHADOW_CAT_SYSTEM</div>
+        <div style="font-weight: bold; font-size: 14px; letter-spacing: 3px; color: #a333ff;" id="tit-compile">COMPILING GEOMETRY_CORE</div>
         <div class="barra-progreso-contenedor">
             <div id="barra-progreso-linea"></div>
         </div>
-        <div id="texto-matematico">f(x) = sin(θ) * static_cast<float>(core_matrix)</div>
+        <div id="texto-matematico">f(x) = sin(θ) * core_matrix</div>
     </div>
 
     <canvas id="canvasJuego"></canvas>
@@ -137,8 +137,8 @@
 
     <div id="pantalla-menu" class="pantalla">
         <h1 class="titulo-principal">SHADOW CAT 3.0</h1>
-        <div class="subtitulo">True Cat Physics & PERSISTENT DATA</div>
-        <div class="marcador-puntos">Mis Puntos Guardados: <span id="txt-puntos">0</span> PTS</div>
+        <div class="subtitulo">True Cat Physics & SPECIAL FX</div>
+        <div class="marcador-puntos">Mis Puntos: <span id="txt-puntos">0</span> PTS</div>
         
         <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-original')">Modo Arena (Original)</button>
         <button class="btn-menu btn-verde" onclick="cambiarPantalla('juego-ritmo')">Dance of Fire and Ice</button>
@@ -155,3 +155,4 @@
     <script src="sketch.js"></script>
 </body>
 </html>
+
