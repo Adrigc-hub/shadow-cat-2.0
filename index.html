@@ -3,170 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SHADOW CAT: JJK ARENA</title>
+    <title>SHADOW CAT: JJK ARENA 2.0</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
-            background-color: #05050a;
-            color: white;
+            margin: 0; padding: 0;
+            background-color: #020205; color: white;
             font-family: 'Segoe UI', Roboto, sans-serif;
-            overflow: hidden;
-            user-select: none;
-            -webkit-user-select: none;
+            overflow: hidden; user-select: none; -webkit-user-select: none;
         }
-        /* Contenedor e Interfaz de Pantallas */
         .pantalla {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            box-sizing: border-box;
-            padding: 20px;
-            z-index: 5;
+            position: absolute; width: 100%; height: 100%;
+            display: none; flex-direction: column;
+            align-items: center; justify-content: center;
+            box-sizing: border-box; padding: 20px; z-index: 5;
         }
-        .activa {
-            display: flex;
-        }
+        .activa { display: flex; }
         
-        .titulo-principal {
-            font-size: 26px;
-            letter-spacing: 1px;
-            margin-bottom: 5px;
-            text-align: center;
-            font-weight: bold;
-        }
-        .subtitulo {
-            font-size: 11px;
-            color: #a333ff;
-            margin-bottom: 30px;
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-        .marcador-puntos {
-            font-size: 15px;
-            color: #ffcc00;
-            margin-bottom: 35px;
-            font-weight: bold;
-        }
-        /* Botones del Menú */
+        .titulo-principal { font-size: 28px; letter-spacing: 2px; margin-bottom: 5px; text-align: center; font-weight: bold; color: #fff; text-shadow: 0 0 10px #9000c7; }
+        .subtitulo { font-size: 11px; color: #a333ff; margin-bottom: 30px; text-transform: uppercase; font-weight: bold; }
+        .marcador-puntos { font-size: 16px; color: #ffcc00; margin-bottom: 35px; font-weight: bold; }
+        
         .btn-menu {
-            width: 85%;
-            max-width: 280px;
-            padding: 15px;
-            margin: 8px 0;
-            border: none;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: bold;
-            color: white;
-            cursor: pointer;
-            text-transform: uppercase;
-            transition: transform 0.1s ease;
+            width: 85%; max-width: 280px; padding: 14px; margin: 8px 0;
+            border: none; border-radius: 8px; font-size: 13px; font-weight: bold;
+            color: white; cursor: pointer; text-transform: uppercase;
+            transition: transform 0.1s ease, box-shadow 0.2s;
         }
-        .btn-menu:active {
-            transform: scale(0.95);
-        }
-        .btn-azul { background-color: #007bef; }
-        .btn-rosa { background-color: #e60067; }
-        .btn-morado { background-color: #9000c7; }
-        .btn-verde { background-color: #00b359; }
+        .btn-menu:active { transform: scale(0.95); }
+        .btn-azul { background: #007bef; box-shadow: 0 4px 10px rgba(0,123,239,0.3); }
+        .btn-rosa { background: #e60067; box-shadow: 0 4px 10px rgba(230,0,103,0.3); }
+        .btn-morado { background: #9000c7; box-shadow: 0 4px 10px rgba(144,0,199,0.3); }
+        .btn-verde { background: #00b359; box-shadow: 0 4px 10px rgba(0,179,89,0.3); }
 
-        /* Contenedores de Listas (Skins y Tienda) */
         .lista-tienda {
-            width: 90%;
-            max-width: 320px;
-            max-height: 240px;
-            overflow-y: auto;
-            background: #12121f;
-            border-radius: 12px;
-            padding: 10px;
-            box-sizing: border-box;
-            margin-bottom: 20px;
+            width: 90%; max-width: 320px; max-height: 250px;
+            overflow-y: auto; background: #0b0b12; border: 1px solid #1c1c3a;
+            border-radius: 12px; padding: 10px; box-sizing: border-box; margin-bottom: 20px;
         }
         .item-habilidad {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 10px;
-            border-bottom: 1px solid #1c1c2e;
-        }
-        .info-txt {
-            text-align: left;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 10px; border-bottom: 1px solid #141424;
         }
         .btn-comprar {
-            background: #ffcc00;
-            color: black;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 5px;
-            font-weight: bold;
-            cursor: pointer;
+            background: #ffcc00; color: black; border: none;
+            padding: 8px 14px; border-radius: 5px; font-weight: bold; cursor: pointer;
         }
-        .btn-comprar.adquirido {
-            background: #00ff66;
-            color: black;
-        }
+        .btn-comprar.adquirido { background: #00ff66; color: black; }
 
-        /* HUD Superior del Juego Activo */
         #hud-juego {
-            position: absolute;
-            top: 15px;
-            left: 0;
-            width: 100%;
-            padding: 0 20px;
-            box-sizing: border-box;
-            display: none;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 10;
-            pointer-events: none;
+            position: absolute; top: 15px; left: 0; width: 100%;
+            padding: 0 20px; box-sizing: border-box;
+            display: none; justify-content: space-between; align-items: center;
+            z-index: 10; pointer-events: none;
         }
         .stats-hud {
-            color: white;
-            font-size: 13px;
-            font-weight: bold;
-            text-shadow: 1px 1px 2px black;
-            pointer-events: auto;
+            color: white; font-size: 14px; font-weight: bold;
+            text-shadow: 1px 1px 3px black; pointer-events: auto;
+            background: rgba(0,0,0,0.4); padding: 6px 12px; border-radius: 6px;
         }
         .btn-pausa {
-            padding: 8px 14px;
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.4);
-            color: white;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            pointer-events: auto;
+            padding: 8px 14px; background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3); color: white;
+            border-radius: 6px; font-weight: bold; cursor: pointer; pointer-events: auto;
         }
 
-        /* Menú de Pausa Flotante */
         #menu-pausa {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(5, 5, 10, 0.85);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(3, 3, 8, 0.9); display: none;
+            flex-direction: column; align-items: center; justify-content: center; z-index: 100;
         }
-        
-        /* El lienzo donde corre todo el juego gráfico */
-        #canvasJuego {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
+        #canvasJuego { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
     </style>
 </head>
 <body>
@@ -178,38 +84,38 @@
     <canvas id="canvasJuego"></canvas>
 
     <div id="hud-juego">
-        <div class="stats-hud" id="txt-hud-stats">Modo: Original | Puntos: 0</div>
+        <div class="stats-hud" id="txt-hud-stats">Cargando partida...</div>
         <button class="btn-pausa" onclick="activarPausa(true)">⏸ PAUSA</button>
     </div>
 
     <div id="menu-pausa">
-        <div style="background: #12121f; padding: 25px; border-radius: 14px; text-align: center; border: 1px solid #333;">
-            <h3 style="margin-top:0; color:#ffcc00;">JUEGO PAUSADO</h3>
+        <div style="background: #0b0b12; padding: 30px; border-radius: 14px; text-align: center; border: 1px solid #222;">
+            <h3 style="margin-top:0; color:#ffcc00; letter-spacing:1px;">JUEGO EN PAUSA</h3>
             <button class="btn-menu btn-azul" style="width:100%;" onclick="activarPausa(false)">Reanudar</button>
-            <button class="btn-menu btn-rosa" style="width:100%; margin-top:8px;" onclick="volverAlMenuPrincipal()">Salir al Menú</button>
+            <button class="btn-menu btn-rosa" style="width:100%; margin-top:10px;" onclick="volverAlMenuPrincipal()">Salir al Menú</button>
         </div>
     </div>
 
     <div id="pantalla-menu" class="pantalla activa">
-        <h1 class="titulo-principal">SHADOW CAT: JJK ARENA</h1>
-        <div class="subtitulo">Físicas Avanzadas & 3 Modos Especiales</div>
-        <div class="marcador-puntos">Puntos Acumulados: <span id="txt-puntos">100</span> PTS</div>
+        <h1 class="titulo-principal">SHADOW CAT 2.0</h1>
+        <div class="subtitulo">Jujutsu Evolution & Físicas Rítmicas</div>
+        <div class="marcador-puntos">Puntos Totales: <span id="txt-puntos">100</span> PTS</div>
         
-        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-original')">Entrar a Combate (Original)</button>
-        <button class="btn-menu btn-verde" onclick="cambiarPantalla('juego-ritmo')">Dance of Fire</button>
+        <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-original')">Jugar Original</button>
+        <button class="btn-menu btn-verde" onclick="cambiarPantalla('juego-ritmo')">Dance of Fire and Ice</button>
         <button class="btn-menu btn-azul" onclick="cambiarPantalla('juego-shoot')">Shoot the Box</button>
-        <button class="btn-menu btn-rosa" onclick="cambiarPantalla('hechiceros')">Hechiceros (Skins)</button>
-        <button class="btn-menu btn-morado" onclick="cambiarPantalla('tienda')">Habilidades Comprables</button>
+        <button class="btn-menu btn-rosa" onclick="cambiarPantalla('hechiceros')">Selección de Skins</button>
+        <button class="btn-menu btn-morado" onclick="cambiarPantalla('tienda')">Tienda de Mejoras</button>
     </div>
 
     <div id="pantalla-hechiceros" class="pantalla">
-        <h2>SELECCIÓN DE HECHICEROS</h2>
+        <h2>SELECTOR DE SKINS</h2>
         <div class="lista-tienda" id="contenedor-hechiceros"></div>
         <button class="btn-menu btn-rosa" onclick="cambiarPantalla('menu')">Volver al Menú</button>
     </div>
 
     <div id="pantalla-tienda" class="pantalla">
-        <h2>HABILIDADES COMPRABLES</h2>
+        <h2>TIENDA DE MEJORAS</h2>
         <div class="lista-tienda" id="contenedor-tienda"></div>
         <button class="btn-menu btn-morado" onclick="cambiarPantalla('menu')">Volver al Menú</button>
     </div>
@@ -217,4 +123,3 @@
     <script src="sketch.js"></script>
 </body>
 </html>
-
