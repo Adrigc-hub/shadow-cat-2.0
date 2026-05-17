@@ -1,0 +1,21 @@
+{
+  "puntosIniciales": 150,
+  "cancionesDisponibles": [
+    {"id": "viento_maldito", "nombre": "Maldición Eterna - LoFi 140BPM"},
+    {"id": "ritmo_santuario", "nombre": "Santuario de Fuego - Speedcore 180BPM"},
+    {"id": "vacio_core", "nombre": "Void Core (Geode Remix) - 160BPM"}
+  ],
+  "habilidadesOriginales": [
+    { "id": "escudo_temp", "nombre": "Escudo Temporal (Activable)", "costo": 50 },
+    { "id": "escudo_auto", "nombre": "Escudo Automático (Pasiva)", "costo": 30 },
+    { "id": "auto_aim", "nombre": "Auto-Aim Legendario", "costo": 1000000 },
+    { "id": "rafaga_maldita", "nombre": "Ráfaga Maldita", "costo": 120 },
+    { "id": "destello_negro", "nombre": "Probabilidad de Destello Negro", "costo": 200 },
+    { "id": "vuelo_libre", "nombre": "Vuelo de Pájaro", "costo": 180 },
+    { "id": "recarga_rapida", "nombre": "Recarga de Hechicero", "costo": 90 },
+    { "id": "imantado", "nombre": "Imán de Puntos", "costo": 75 },
+    { "id": "curacion_reversa", "nombre": "Técnica de Maldición Inversa", "costo": 300 },
+    { "id": "seis_ojos", "nombre": "Percepción de los Seis Ojos", "costo": 500 }
+  ]
+}
+
