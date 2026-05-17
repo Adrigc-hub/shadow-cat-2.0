@@ -1,18 +1,10 @@
 // --- CONFIGURACIÓN PRINCIPAL ---
 let puntosAcumulados = 0;
-let modoActual = "carga";
+let modoActual = "menu"; // Arranca directamente en el menú principal
 let juegoPausado = false;
 let skinEquipada = "Default Cat";
 let audioCtx = null;
 let nodoMusicaMenu = null;
-
-const FORMULAS_MATH_CODE = [
-    "matrix_projection[0][0] = 2.0 * near / (right - left);",
-    "X_new = x * cos(θ) - y * sin(θ) + translation.x;",
-    "hitbox.dist = abs(A*x + B*y + C) / sqrt(A*A + B*B);",
-    "velocity.y += gravity * delta_time;",
-    "ΔE = Δm * c² (Cursed Energy Output Calculation)"
-];
 
 const SKINS_GATOS = {
     "Default Cat": { principal: "#d2691e", pecho: "#ffffff", ojos: "#00ff00", aura: "rgba(255,255,255,0.15)" },
@@ -25,22 +17,11 @@ let jugadorX = 200, jugadorY = 400, jugadorHP = 10;
 let misBalas = [], objetivosOriginales = [], balasCaendo = [];
 let estrellasFondo = [], puntosPartida = 0;
 
-// Estado del Boss y Animaciones Especiales
-let temporizadorBlackFlash = 0; 
-let temporizadorCinematicaGojo = 0; 
+// Estado del Boss y Animaciones
 let miniBossActivo = false;
 let miniBossHP = 20;
 let miniBossX = 200, miniBossY = 90, miniBossVX = 1.5;
 let tiempoInicioPartida = 0;
-
-// Estado Sukuna
-let jefeSukunaHP = 100;
-let cuadroSukuna = { x: 0, y: 0, w: 260, h: 260 };
-let temporizadorFaseSukuna = 0;
-let turnoJugadorSukuna = false;
-let listaAtaquesFase = [];
-let temporizadorBancaIntro = 0;
-let bancaCortada = false;
 
 // Mecánicas Dance of Fire
 let bloquesRitmo = [];
@@ -56,11 +37,8 @@ let inicioToqueX = 0, inicioToqueY = 0;
 let arrastreX = 0, arrastreY = 0;
 let tiempoUltimaCajaShoot = 0;
 
-// Carga y Animación de Construcción Literal
-let progresoCargaPorcentaje = 0;
-let lineasMatematicasVisibles = [];
-let temporizadorConstruccionMenu = 0; 
-let rayosConstruccion = [];
+// Control de Animación de Construcción del Menú
+let tiempoInicioMenu = 0;
 
 const canvas = document.getElementById("canvasJuego");
 const ctx = canvas.getContext("2d");
@@ -140,15 +118,9 @@ function playSound(tipo) {
 
     if (tipo === "click" || tipo === "hit") {
         osc.type = "sine"; osc.frequency.setValueAtTime(550, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.06, dynamicTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
         osc.start(); osc.stop(audioCtx.currentTime + 0.08);
-    } else if (tipo === "rayo_verde") {
-        osc.type = "triangle"; osc.frequency.setValueAtTime(350, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(700, audioCtx.currentTime + 0.04);
-        gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.05);
     }
 }
 
@@ -161,13 +133,13 @@ function cambiarPantalla(destino) {
     if(pHech) pHech.classList.remove("activa");
     if(hud) hud.style.display = "none";
 
-    juegoPausado = false; miniBossActivo = false; temporizadorCinematicaGojo = 0; 
-    temporizadorBancaIntro = 0; bancaCortada = false;
-    puntosPartida = 0; jugadorHP = 10; jefeSukunaHP = 100; turnoJugadorSukuna = false;
+    juegoPausado = false; miniBossActivo = false;
+    puntosPartida = 0; jugadorHP = 10;
     camaraScrollX = 0; camaraScrollY = 0;
 
     if (destino === 'menu') {
         modoActual = "menu";
+        tiempoInicioMenu = Date.now(); // Reiniciar animación de construcción de las líneas
         gestionarMusicaEstados();
         if(pMenu) pMenu.classList.add("activa");
     } else if (destino === 'hechiceros') {
@@ -207,8 +179,7 @@ function volverAlMenuPrincipal() {
 // --- EVENTOS DE ENTRADA ---
 window.addEventListener('pointerdown', (e) => {
     inicializarAudioNativo();
-    if (juegoPausado || modoActual === "carga") return;
-
+    if (juegoPausado) return;
     if (modoActual === "menu") return;
 
     if (modoActual === "original") {
@@ -255,7 +226,7 @@ window.addEventListener('pointerdown', (e) => {
 });
 
 window.addEventListener('pointermove', (e) => {
-    if (juegoPausado || modoActual === "menu" || modoActual === "carga") return;
+    if (juegoPausado || modoActual === "menu") return;
     if (modoActual === "original" || modoActual === "ritmo") jugadorX = Math.max(30, Math.min(canvas.width - 30, e.clientX));
     if (modoActual === "shoot" && cargandoTiroShoot) { arrastreX = e.clientX; arrastreY = e.clientY; }
 });
@@ -286,24 +257,18 @@ function generarCaminoBloquesRitmo() {
     anguloPlaneta = 0;
 }
 
-// --- LOOP PRINCIPAL DE RENDERIZADO COMPLETAMENTE FIJADO ---
+// --- LOOP PRINCIPAL DE RENDERIZADO ---
 function buclePrincipal() {
-    // Forzar limpieza negra de fondo siempre
     ctx.fillStyle = "#020205"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    if (modoActual === "carga") {
-        ejecutarProcesamientoCargaMatricial();
-        requestAnimationFrame(buclePrincipal);
-        return;
-    }
-
-    // Estrellas de fondo uniformes
+    // Estrellas de fondo estables
     ctx.fillStyle = "rgba(255,255,255,0.2)";
     estrellasFondo.forEach(st => { ctx.fillRect(st.x, st.y, st.size, st.size); });
 
     if (modoActual === "menu") {
         dibujarGatoEnBancaMenu();
+        animarLineasConstruccionMenu();
     } else if (!juegoPausado) {
         if (modoActual === "original") actualizarModoOriginal();
         else if (modoActual === "ritmo") actualizarModoRitmo();
@@ -312,36 +277,36 @@ function buclePrincipal() {
         if (jugadorHP <= 0) { alert("Gato Derrotado."); volverAlMenuPrincipal(); }
     }
 
-    if (modoActual !== "menu" && modoActual !== "ritmo" && temporizadorCinematicaGojo === 0 && temporizadorBancaIntro === 0) {
+    if (modoActual !== "menu" && modoActual !== "ritmo") {
         dibujarGatoReal(jugadorX, jugadorY);
     }
 
     requestAnimationFrame(buclePrincipal);
 }
 
-// --- ANIMACIÓN: GATO EN BANCA MOVIENDO LA COLA EN EL MENÚ ---
+// --- ANIMACIÓN CENTRAL: GATO SENTADO EN BANCA MOVIENDO LA COLA ---
 function dibujarGatoEnBancaMenu() {
     let cx = canvas.width / 2;
-    let cy = canvas.height / 2 - 130; 
+    let cy = canvas.height / 2 - 140; 
 
-    // Dibujar la Banca de Madera de fondo
+    // Dibujar la Banca de Madera
     ctx.fillStyle = "#7a431d";
     ctx.fillRect(cx - 70, cy + 30, 140, 10); 
     ctx.fillStyle = "#5c3214";
-    ctx.fillRect(cx - 60, cy + 40, 8, 25);   
-    ctx.fillRect(cx + 52, cy + 40, 8, 25);   
+    ctx.fillRect(cx - 60, cy + 40, 8, 25);   // Pata Izquierda
+    ctx.fillRect(cx + 52, cy + 40, 8, 25);   // Pata Derecha
     ctx.fillRect(cx - 65, cy + 10, 6, 20);   
     ctx.fillRect(cx + 59, cy + 10, 6, 20);   
-    ctx.fillRect(cx - 70, cy, 140, 12);      
+    ctx.fillRect(cx - 70, cy, 140, 12);      // Respaldo
 
-    // Lógica rítmica de la colita del gato
-    let anguloCola = Math.sin(Date.now() * 0.006) * 0.4;
+    // Animación fluida de la cola oscilando con el tiempo
+    let anguloCola = Math.sin(Date.now() * 0.007) * 0.45;
     let s = SKINS_GATOS[skinEquipada] || SKINS_GATOS["Default Cat"];
 
-    // Aura flotante
+    // Aura mística trasera
     ctx.fillStyle = s.aura; ctx.beginPath(); ctx.arc(cx, cy + 10, 35, 0, Math.PI*2); ctx.fill();
 
-    // Dibujar la Colita Rítmica
+    // Renderizado de la Colita Rítmica
     ctx.save();
     ctx.translate(cx - 12, cy + 24);
     ctx.rotate(anguloCola);
@@ -354,93 +319,59 @@ function dibujarGatoEnBancaMenu() {
     ctx.stroke();
     ctx.restore();
 
-    // Cuerpo del gato sentado
+    // Cuerpo y Cabeza
     ctx.fillStyle = s.principal;
     ctx.beginPath(); ctx.arc(cx, cy + 10, 14, 0, Math.PI*2); ctx.fill(); 
     ctx.fillStyle = s.pecho;
     ctx.beginPath(); ctx.ellipse(cx, cy + 26, 11, 10, 0, 0, Math.PI*2); ctx.fill(); 
 
-    // Orejitas
+    // Orejas
     ctx.fillStyle = s.principal;
     ctx.beginPath(); ctx.moveTo(cx - 12, cy); ctx.lineTo(cx - 14, cy - 10); ctx.lineTo(cx - 4, cy - 4); ctx.fill();
     ctx.beginPath(); ctx.moveTo(cx + 12, cy); ctx.lineTo(cx + 14, cy - 10); ctx.lineTo(cx + 4, cy - 4); ctx.fill();
 
-    // Ojitos
+    // Ojos brillantes de la Skin
     ctx.fillStyle = s.ojos;
     ctx.fillRect(cx - 5, cy + 5, 3, 5);
     ctx.fillRect(cx + 3, cy + 5, 3, 5);
 }
 
-// --- ANIMACIÓN DE CARGA VECTORIAL PASO A PASO ---
-function ejecutarProcesamientoCargaMatricial() {
-    let cx = canvas.width / 2; let cy = canvas.height / 2;
+// --- ANIMACIÓN DE CONTORNO: CONSTRUCCIÓN EFECTO MATRIX/NEÓN ---
+function animarLineasConstruccionMenu() {
+    let cx = canvas.width / 2;
+    let cy = canvas.height / 2;
+    
+    // Progreso automático basado en los primeros 2 segundos desde que se cargó el menú
+    let transcurrido = Date.now() - tiempoInicioMenu;
+    let pct = Math.min(1, transcurrido / 2000); 
 
-    if (temporizadorConstruccionMenu === 0) {
-        progresoCargaPorcentaje += 1.5;
-        let barra = document.getElementById("barra-progreso-linea");
-        if(barra) barra.style.width = `${Math.min(100, progresoCargaPorcentaje)}%`;
+    ctx.strokeStyle = "rgba(0, 255, 130, 0.8)";
+    ctx.lineWidth = 2;
 
-        if (Math.random() < 0.12) {
-            let fRandom = FORMULAS_MATH_CODE[Math.floor(Math.random() * FORMULAS_MATH_CODE.length)];
-            let txtMath = document.getElementById("texto-matematico");
-            if(txtMath) txtMath.innerText = fRandom;
-        }
+    // Coordenadas aproximadas de los botones del menú en pantalla para simular su escaneo
+    let posicionesY = [cy - 60, cy + 10, cy + 80];
+    let anchoCaja = 260;
+    let progresoAncho = anchoCaja * pct;
 
-        if (progresoCargaPorcentaje >= 100) {
-            temporizadorConstruccionMenu = 180; 
-            let pCarga = document.getElementById("pantalla-carga");
-            if(pCarga) pCarga.style.display = "none"; 
-        }
-    } else {
-        temporizadorConstruccionMenu--;
-        let pctInverso = (180 - temporizadorConstruccionMenu) / 180; 
+    posicionesY.forEach(y => {
+        ctx.beginPath();
+        // Línea superior izquierda a derecha
+        ctx.moveTo(cx - 130, y);
+        ctx.lineTo(cx - 130 + progresoAncho, y);
+        // Línea inferior derecha a izquierda
+        ctx.moveTo(cx + 130, y + 45);
+        ctx.lineTo(cx + 130 - progresoAncho, y + 45);
+        ctx.stroke();
+    });
 
-        if (temporizadorConstruccionMenu % 8 === 0) {
-            playSound("rayo_verde");
-            rayosConstruccion.push({
-                x1: Math.random() * canvas.width, y1: 0,
-                x2: cx + (Math.random() - 0.5) * 400, y2: cy + (Math.random() - 0.5) * 300,
-                duracion: 10
-            });
-        }
-
-        ctx.lineWidth = 2;
-        for (let i = rayosConstruccion.length - 1; i >= 0; i--) {
-            let r = rayosConstruccion[i];
-            ctx.strokeStyle = `rgba(0, 255, 130, ${r.duracion / 10})`;
-            ctx.beginPath(); ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); stroke();
-            r.duracion--; if (r.duracion <= 0) rayosConstruccion.splice(i, 1);
-        }
-
-        // Dibujo progresivo real
-        ctx.strokeStyle = "rgb(0, 255, 130)";
-        ctx.lineWidth = 3;
-        
-        let botonesY = [cy - 80, cy - 10, cy + 60];
-        let maxAncho = 280;
-        let tramoActual = maxAncho * pctInverso; 
-
-        botonesY.forEach(y => {
-            ctx.beginPath();
-            ctx.moveTo(cx - 140, y);
-            ctx.lineTo(cx - 140 + tramoActual, y);
-            ctx.moveTo(cx + 140, y + 50);
-            ctx.lineTo(cx + 140 - tramoActual, y + 50);
-            ctx.stroke();
-        });
-
+    if (pct < 1) {
         ctx.fillStyle = "rgba(0, 255, 130, 0.9)";
-        ctx.font = "bold 15px Courier New";
-        ctx.fillText(`GRAFICANDO INTERFAZ MATEMÁTICA: ${Math.floor(pctInverso * 100)}%`, cx - 170, cy - 130);
-
-        if (temporizadorConstruccionMenu === 1) {
-            cargarProgresoGuardado();
-            cambiarPantalla('menu');
-        }
+        ctx.font = "13px Courier New";
+        ctx.fillText(`CONSTRUYENDO INTERFAZ VECTORIAL...`, cx - 130, cy - 90);
     }
 }
 
-// --- MODO ORIGINAL (FLUIDO Y OPERATIVO) ---
+// --- MODOS DE JUEGO ---
 function actualizarModoOriginal() {
     if (Math.random() < 0.02) objetivosOriginales.push({ x: Math.random() * (canvas.width - 50), y: -40 });
     if (Math.random() < 0.025) balasCaendo.push({ x: Math.random() * canvas.width, y: -20, vy: 3 });
@@ -495,8 +426,6 @@ function actualizarModoOriginal() {
         ctx.fillStyle = "#e60067"; ctx.fillRect(miniBossX - 45, miniBossY, 90, 50);
     }
 }
-
-function actualizarModoSukuna() {}
 
 function actualizarModoRitmo() {
     anguloPlaneta += 0.06;
@@ -554,11 +483,19 @@ function renderSkins() {
 
 function equiparSkin(name) { skinEquipada = name; guardarProgresoLocal(); renderSkins(); }
 
-// ARRANQUE AUTOMÁTICO CORREGIDO
+// --- INICIALIZACIÓN DIRECTA ---
 window.onload = () => { 
     redimensionar(); 
     generarEstrellas(); 
     cargarProgresoGuardado(); 
-    buclePrincipal(); // Activa el motor gráfico de inmediato
-};
+    tiempoInicioMenu = Date.now(); // Iniciar contador de la animación
+    
+    // Ocultar la pantalla de carga vieja si seguía en tu HTML para evitar que tape el Canvas
+    let pCarga = document.getElementById("pantalla-carga");
+    if(pCarga) pCarga.style.display = "none"; 
+    
+    let pMenu = document.getElementById("pantalla-menu");
+    if(pMenu) pMenu.classList.add("activa");
 
+    buclePrincipal(); 
+};
