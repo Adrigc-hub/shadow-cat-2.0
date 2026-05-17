@@ -9,3 +9,4 @@ V1.01: made a sans type secret boss fight and 20 random attacks, fixed the rando
 V1.02: Perfect mini-games and more
 V1.03: added loading screen and fixed some issues
 V1.04: made the loading screen better, fixxed the secret boss fight being too hard, secret animation added
+V1.05: fixxed the dance of fire and ice gamemode, fixxed hitboxes and fixxed the secret animation 
