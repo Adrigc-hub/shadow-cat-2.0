@@ -26,4 +26,5 @@ V1.18: MASSIVE secret update.
 V1.19: added songs and more things to the editor. 
 V2.00: made the normal gamemode better. 
 V2.01: i don't think this was made by code anymore (added reallistic things). 
-V2.02 added the posibility to make your own mods
+V2.02: added the posibility to make your own mods.
+V2.03: fixed the game
