@@ -1,63 +1,192 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Shadow Cat Mod Center</title>
-    <style>
-        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #020205; font-family: monospace; }
-        canvas { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        .interfaz-html { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10; color: white; }
-        .caja-desplazable { width: 310px; max-height: 45%; overflow-y: auto; background: rgba(5, 5, 10, 0.95); border: 1px solid #00ff82; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-        .btn-menu-cons { padding: 10px; background: rgba(0,255,130,0.1); border: 1px solid #00ff82; color: #00ff82; font-weight: bold; width: 100%; cursor: pointer; }
-        .item-tienda { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 6px; font-size: 11px; }
-        .btn-comprar { background: #00ff82; border: none; color: black; font-weight: bold; padding: 3px 6px; }
-        .overlay-pausa { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 40; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; }
-        .item-habilidad { padding: 10px; background: rgba(163,51,255,0.2); border: 1px solid #a333ff; width: 200px; text-align: center; margin-bottom: 8px; }
-    </style>
-</head>
-<body>
+/**
+ * ============================================================================
+ * SHADOW CAT ENGINE v2.02 - MASTER CONTROL PIPELINE (sketch.js)
+ * TOTALMENTE REESCRITO - REPARA SELECCIÓN DE NIVELES TÁCTILES EN IPAD
+ * ============================================================================
+ */
 
-    <canvas id="canvasJuego"></canvas>
-    <div id="hud-juego" style="position:absolute; top:15px; left:20px; display:none; color:white; z-index:20;">ENERGÍA ACTIVA</div>
+// --- VARIABLES DE CONTROL GLOBAL DE INTERFAZ ---
+let arrayNivelesCreados = [];
+let nombreNivelActualEjecutando = "";
 
-    <div id="pantalla-hechiceros" class="interfaz-html">
-        <h2>SKINS DISPONIBLES</h2><br>
-        <div id="contenedor-hechiceros"></div>
-    </div>
+/**
+ * Inicializador estándar del ecosistema del juego.
+ * Configura el canvas, hereda el motor monolítico y enlaza el menú visual.
+ */
+function setup() {
+    console.log("🎮 Inicializando Pipeline Principal de Shadow Cat...");
+    
+    // Conectamos el canvas con el motor unificado de gráficos y físicas
+    if (window.MasterShadowCatEngine) {
+        window.MasterShadowCatEngine.inicializarSistemaTotal("canvasJuego");
+    } else {
+        console.error("❌ Error Crítico: No se encontró 'MasterShadowCatEngine'. Verifica que engine-monolith-core.js cargue antes.");
+    }
 
-    <div id="pantalla-tienda" class="interfaz-html">
-        <h2>TIENDA DE MEJORAS</h2><br>
-        <div id="contenedor-tienda" class="caja-desplazable"></div><br>
-        <button class="btn-comprar" style="width:310px; height:30px;" onclick="cambiarPantalla('menu')">VOLVER</button>
-    </div>
+    // Cargamos los niveles que ya guardaste previamente en el LocalStorage para que no se pierdan
+    recuperarNivelesDesdeAlmacenamiento();
 
-    <div id="pantalla-construccion-raiz" class="interfaz-html">
-        <h2>MODO CONSTRUCCIÓN</h2><br>
-        <div style="width:310px; display:flex; gap:8px; margin-bottom:10px;">
-            <button class="btn-menu-cons" onclick="accionarLupa()">🔍 LUPA</button>
-            <button class="btn-menu-cons" onclick="mostrarRecientes()">⏳ RECIENTE</button>
-        </div>
-        <button class="btn-menu-cons" style="background:#00ff82; color:black; margin-bottom:10px;" onclick="cambiarPantalla('abrir_selector_tipo')">🛠️ NEW (CREAR)</button>
-        <div id="lista-proyectos" class="caja-desplazable"></div><br>
-        <button class="btn-comprar" style="width:310px; height:30px;" onclick="cambiarPantalla('menu')">VOLVER</button>
-    </div>
+    // Activamos el escuchador maestro de clics/toques táctiles sobre tu lista de niveles
+    inyectarManejadorDeClicksDeNivel();
+}
 
-    <div id="pantalla-selector-tipo-construccion" class="interfaz-html">
-        <h2>ELIGE TIPO DE SUB-JUEGO</h2><br>
-        <button class="btn-menu-cons" style="width:280px; margin-bottom:8px;" onclick="iniciarNuevoProyectoFlujo('dance')">🔥 DANCE OF FIRE AND ICE</button>
-        <button class="btn-menu-cons" style="width:280px; margin-bottom:8px;" onclick="iniciarNuevoProyectoFlujo('shoot')">📦 SHOOT THE BOX</button>
-        <button class="btn-menu-cons" style="width:280px; margin-bottom:15px;" onclick="iniciarNuevoProyectoFlujo('normal')">⚔️ MODO NORMAL</button>
-        <button class="btn-comprar" style="width:280px; height:30px; background:#ff3c3c; color:white;" onclick="cambiarPantalla('menu_construccion')">CANCELAR</button>
-    </div>
+/**
+ * Bucle gráfico nativo secundario (Sincronizado con el maestro)
+ */
+function draw() {
+    // Toda la renderización pesada delegada al Monolito para evitar lag en iOS/iPadOS
+}
 
-    <div id="editor-pausa-overlay" class="overlay-pausa">
-        <h2>EDICIÓN PAUSADA</h2><br>
-        <button class="btn-menu-cons" style="width:220px; background:#00ff82; color:black; margin-bottom:10px;" onclick="cerrarOverlayPausaEditor()">SEGUIR</button>
-        <button class="btn-menu-cons" style="width:220px; background:#ff3c3c; color:white;" onclick="guardarYSalirEditorTotal()">SAVE Y EXIT</button>
-    </div>
+/**
+ * RECUPERADOR DE MEMORIA LOCAL
+ * Lee los niveles guardados en el almacenamiento del navegador para renderizar la lista visual
+ */
+function recuperarNivelesDesdeAlmacenamiento() {
+    try {
+        let datosLocales = localStorage.getItem("shadow_cat_custom_levels");
+        if (datosLocales) {
+            arrayNivelesCreados = JSON.parse(datosLocales);
+        } else {
+            // Si está vacío, creamos la lista base idéntica a tus capturas de pantalla
+            arrayNivelesCreados = [
+                { nombre: "Mi Nivel SpaceX", tipo: "DANCE" },
+                { nombre: "Mi Nivel SpaceX", tipo: "SHOOT" },
+                { nombre: "Mi Nivel SpaceX", tipo: "SHOOT" },
+                { nombre: "Mi Nivel SpaceX", tipo: "DANCE" }
+            ];
+            localStorage.setItem("shadow_cat_custom_levels", JSON.stringify(arrayNivelesCreados));
+        }
+        console.log("📂 Niveles cargados en caché:", arrayNivelesCreados);
+    } catch (e) {
+        console.error("Error al leer base de datos de niveles:", e);
+    }
+}
 
-    <script src="sketch.js"></script>
-</body>
-</html>
+/**
+ * EL ARREGLO MAESTRO: CAPTURA DE CLICS TÁCTILES EN LA LISTA VERDE
+ * Esta función intercepta cuando tu dedo toca la pantalla sobre cualquier caja de nivel
+ */
+function inyectarManejadorDeClicksDeNivel() {
+    // Buscador universal de elementos: Escuchamos clics directamente en la ventana para máxima compatibilidad
+    window.addEventListener("click", function (evento) {
+        let elementoTocado = evento.target;
+        
+        // Buscamos si el elemento tocado contiene texto de tus niveles de SpaceX
+        if (elementoTocado && elementoTocado.innerText) {
+            let textoFila = elementoTocado.innerText.trim();
+
+            if (textoFila.includes("Mi Nivel SpaceX") || textoFila.includes("SPACEX")) {
+                console.log("🎯 ¡Nivel detectado y presionado con éxito! -> " + textoFila);
+                
+                // Evitamos que el navegador procese otros clics fantasmas en el iPad
+                evento.preventDefault();
+                evento.stopPropagation();
+
+                // Procesar e iniciar el nivel
+                analizarYArrancarSubJuego(textoFila);
+            }
+        }
+    }, { passive: false });
+
+    // Duplicamos el escuchador para eventos táctiles puros de pantalla móvil (Touch)
+    window.addEventListener("touchend", function (evento) {
+        let elementoTocado = evento.target;
+        if (elementoTocado && elementoTocado.innerText) {
+            let textoFila = elementoTocado.innerText.trim();
+            if (textoFila.includes("Mi Nivel SpaceX") || textoFila.includes("SPACEX")) {
+                evento.preventDefault();
+                analizarYArrancarSubJuego(textoFila);
+            }
+        }
+    }, { passive: false });
+}
+
+/**
+ * ENRUTADOR INTEGRADO DE SUB-JUEGOS
+ * Lee el texto de la celda de tu menú y activa la simulación exacta en el monolito
+ */
+function analizarYArrancarSubJuego(textoIdentificador) {
+    let textoFormateado = textoIdentificador.toUpperCase();
+    nombreNivelActualEjecutando = textoIdentificador;
+
+    console.log(`🤖 Decodificando configuración para el estado de: [${textoFormateado}]`);
+
+    // Validación estricta por cadenas para saber si es de Ritmo (Dance) o Físicas (Shoot)
+    if (textoFormateado.includes("(DANCE)") || textoFormateado.includes("DANCE")) {
+        if (window.MasterShadowCatEngine) {
+            window.MasterShadowCatEngine.cambiarModoDeSubJuego("DANCE_OF_FIRE");
+            forzarCierreDeMenusHTML();
+        }
+    } 
+    else if (textoFormateado.includes("(SHOOT)") || textoFormateado.includes("SHOOT")) {
+        if (window.MasterShadowCatEngine) {
+            window.MasterShadowCatEngine.cambiarModoDeSubJuego("SHOOT_THE_BOX");
+            forzarCierreDeMenusHTML();
+        }
+    } 
+    else if (textoFormateado.includes("(NORMAL)") || textoFormateado.includes("NORMAL") || textoFormateado.includes("ORIGINAL")) {
+        if (window.MasterShadowCatEngine) {
+            window.MasterShadowCatEngine.cambiarModoDeSubJuego("MODO_NORMAL");
+            forzarCierreDeMenusHTML();
+        }
+    }
+}
+
+/**
+ * INTERFAZ FLUIDA: OCULTACIÓN DE MENÚS CAPA VERDE
+ * Apaga los bloques de la interfaz de texto de botones para dejar ver el lienzo del juego puro
+ */
+function forzarCierreDeMenusHTML() {
+    console.log("🧹 Limpiando pantallas de menús. Abriendo compuertas del juego principal.");
+
+    // Intentamos apagar todos los selectores de contenedores comunes que usas en tu HTML
+    const selectoresMenus = [
+        '.modo-construccion', 
+        '#menuConstruccion', 
+        '.menu-principal', 
+        '#listaNiveles',
+        'div[style*="position: absolute"]' // Por si usaste estilos en línea para tus cajas verdes
+    ];
+
+    selectoresMenus.forEach(selector => {
+        const elementos = document.querySelectorAll(selector);
+        elementos.forEach(menu => {
+            // Si el elemento contiene los botones pero no el canvas, lo ocultamos con seguridad
+            if (menu && !menu.contains(document.getElementById("canvasJuego"))) {
+                // Buscamos si el texto interior coincide con el menú de construcción para no apagar el canvas por error
+                if (menu.innerText && (menu.innerText.includes("CONSTRUCCIÓN") || menu.innerText.includes("VOLVER") || menu.innerText.includes("SPACEX"))) {
+                    menu.style.setProperty('display', 'none', 'important');
+                }
+            }
+        });
+    });
+
+    // Despertamos los hilos de ejecución del estado del Monolito
+    if (window.ENGINE_GLOBAL_STATE) {
+        window.ENGINE_GLOBAL_STATE.running = true;
+        window.ENGINE_GLOBAL_STATE.modoActual = window.ENGINE_GLOBAL_STATE.modoActual; // Forzar refresco de dibujado
+    }
+}
+
+// --- CONEXIÓN DE TUS BOTONES VERDES DE LA PANTALLA PRINCIPAL ---
+window.alPresionarModoOriginal = function() {
+    if (window.MasterShadowCatEngine) window.MasterShadowCatEngine.cambiarModoDeSubJuego("MODO_NORMAL");
+    forzarCierreDeMenusHTML();
+};
+
+window.alPresionarDanceOfFire = function() {
+    if (window.MasterShadowCatEngine) window.MasterShadowCatEngine.cambiarModoDeSubJuego("DANCE_OF_FIRE");
+    forzarCierreDeMenusHTML();
+};
+
+window.alPresionarShootTheBox = function() {
+    if (window.MasterShadowCatEngine) window.MasterShadowCatEngine.cambiarModoDeSubJuego("SHOOT_THE_BOX");
+    forzarCierreDeMenusHTML();
+};
+
+// Autoejecución de respaldo por si p5.js tarda en instanciar la función setup nativa
+setTimeout(() => {
+    if (arrayNivelesCreados.length === 0) {
+        setup();
+    }
+}, 1000);
